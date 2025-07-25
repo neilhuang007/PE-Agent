@@ -69,7 +69,7 @@ export async function comprehensiveBPAnalysis(fileUris, model) {
 }
 
 // Enhanced Agent 1: Deep Information Extraction with Cross-Reference
-export async function deepExtractChunk(chunk, index, transcript, fileUris, model) {
+export async function deepExtractChunk(chunk, index, transcript, businessPlanAnalysis, fileUris, model) {
     try {
         const prompts = await loadEnhancedPrompts();
         const extractPrompt = prompts.deepExtractChunk;
@@ -79,7 +79,9 @@ export async function deepExtractChunk(chunk, index, transcript, fileUris, model
             return `片段 ${index + 1}: ${chunk.substring(0, 500)}...`;
         }
         
-        const prompt = `${extractPrompt.role}
+        // Build content parts with all context
+        const contentParts = [
+            { text: `${extractPrompt.role}
 
 访谈片段 ${index + 1}:
 ${chunk}
@@ -87,11 +89,32 @@ ${chunk}
 完整访谈上下文（用于理解背景）:
 ${transcript.substring(0, 5000)}...
 
+商业计划书分析（用于深度理解和交叉验证）:
+${businessPlanAnalysis ? businessPlanAnalysis.substring(0, 3000) : '无商业计划书数据'}...
+
 ${extractPrompt.extractionFocus.map((req, i) => `${i + 1}. ${req}`).join('\n')}
 
-${extractPrompt.outputFormat}`;
+${extractPrompt.outputFormat}` }
+        ];
         
-        const result = await generateWithThinking(prompt, model, 'Extract key information from this transcript segment');
+        // Add uploaded files for reference
+        if (fileUris && fileUris.length > 0) {
+            contentParts.push({ text: '\n\n**参考文档用于信息提取:**' });
+            fileUris.slice(0, 2).forEach(file => { // Limit to first 2 files to avoid overload
+                if (file.content) {
+                    contentParts.push({ text: `\n文档：${file.displayName}\n${file.content.substring(0, 1000)}...` });
+                } else {
+                    contentParts.push({
+                        fileData: {
+                            mimeType: file.mimeType,
+                            fileUri: file.uri
+                        }
+                    });
+                }
+            });
+        }
+        
+        const result = await generateWithThinking(contentParts, model, 'Extract key information with BP context');
         return result;
         
     } catch (error) {
@@ -175,7 +198,7 @@ ${composePrompt.writingStandards.map((std, i) => `${i + 1}. ${std}`).join('\n')}
 }
 
 // Enhanced Agent 4: Citation Verifier
-export async function verifyCitations(report, model) {
+export async function verifyCitations(report, transcript, businessPlanAnalysis, fileUris, model) {
     try {
         const prompts = await loadEnhancedPrompts();
         const verifyPrompt = prompts.verifyCitations;
@@ -185,17 +208,44 @@ export async function verifyCitations(report, model) {
             return { verified: true, issues: [] };
         }
         
-        const prompt = `${verifyPrompt.role}
+        // Build content parts with all available data
+        const contentParts = [
+            { text: `${verifyPrompt.role}
 
 ${verifyPrompt.checkPoints.map((task, i) => `${i + 1}. ${task}`).join('\n')}
 
 报告内容:
-${report.substring(0, 10000)}
+${report}
 
-请按照以下格式输出验证结果：
-${verifyPrompt.outputFormat}`;
+原始访谈记录:
+${transcript}
+
+商业计划书分析:
+${businessPlanAnalysis || '无商业计划书数据'}` }
+        ];
         
-        const result = await generateWithThinking(prompt, model, 'Verify data accuracy in the report');
+        // Add uploaded files as verification sources
+        if (fileUris && fileUris.length > 0) {
+            contentParts.push({ text: '\n\n**原始文档用于交叉验证:**' });
+            fileUris.forEach(file => {
+                if (file.content) {
+                    // For local TXT files
+                    contentParts.push({ text: `\n文档：${file.displayName}\n${file.content}` });
+                } else {
+                    // For uploaded files
+                    contentParts.push({
+                        fileData: {
+                            mimeType: file.mimeType,
+                            fileUri: file.uri
+                        }
+                    });
+                }
+            });
+        }
+        
+        contentParts.push({ text: `\n\n请按照以下格式输出验证结果：\n${verifyPrompt.outputFormat}` });
+        
+        const result = await generateWithThinking(contentParts, model, 'Verify data accuracy against all available sources');
         
         try {
             return JSON.parse(result);
@@ -210,7 +260,7 @@ ${verifyPrompt.outputFormat}`;
 }
 
 // Enhanced Agent 5: Excellence Validator
-export async function validateExcellence(report, model) {
+export async function validateExcellence(report, transcript, businessPlanAnalysis, fileUris, model) {
     try {
         const prompts = await loadEnhancedPrompts();
         const validatePrompt = prompts.validateExcellence;
@@ -220,7 +270,9 @@ export async function validateExcellence(report, model) {
             return { score: 85, pass: true };
         }
         
-        const prompt = `${validatePrompt.role}
+        // Build content parts with all available data for comprehensive evaluation
+        const contentParts = [
+            { text: `${validatePrompt.role}
 
 评估标准：
 ${validatePrompt.evaluationCriteria.map((criteria, i) => `${i + 1}. ${criteria}`).join('\n')}
@@ -229,12 +281,37 @@ ${validatePrompt.evaluationCriteria.map((criteria, i) => `${i + 1}. ${criteria}`
 ${validatePrompt.outputFormat}
 
 报告内容:
-${report.substring(0, 10000)}
+${report}
 
-请按照以下格式输出评估结果：
-${JSON.stringify(validatePrompt.outputFormat, null, 2)}`;
+原始访谈记录（用于完整性评估）:
+${transcript}
+
+商业计划书分析（用于深度评估）:
+${businessPlanAnalysis || '无商业计划书数据'}` }
+        ];
         
-        const result = await generateWithThinking(prompt, model, 'Evaluate report quality and completeness');
+        // Add uploaded files for comprehensive quality assessment
+        if (fileUris && fileUris.length > 0) {
+            contentParts.push({ text: '\n\n**原始文档用于质量评估:**' });
+            fileUris.forEach(file => {
+                if (file.content) {
+                    // For local TXT files
+                    contentParts.push({ text: `\n文档：${file.displayName}\n${file.content}` });
+                } else {
+                    // For uploaded files
+                    contentParts.push({
+                        fileData: {
+                            mimeType: file.mimeType,
+                            fileUri: file.uri
+                        }
+                    });
+                }
+            });
+        }
+        
+        contentParts.push({ text: `\n\n请按照以下格式输出评估结果：\n${JSON.stringify(validatePrompt.outputFormat, null, 2)}` });
+        
+        const result = await generateWithThinking(contentParts, model, 'Evaluate report quality against all available data sources');
         
         try {
             return JSON.parse(result);
@@ -249,7 +326,7 @@ ${JSON.stringify(validatePrompt.outputFormat, null, 2)}`;
 }
 
 // Enhanced Agent 6: Intelligent Enrichment
-export async function intelligentEnrichment(report, originalSources, model) {
+export async function intelligentEnrichment(report, transcript, businessPlanAnalysis, fileUris, model) {
     try {
         const prompts = await loadEnhancedPrompts();
         const enrichPrompt = prompts.intelligentEnrichment;
@@ -259,21 +336,45 @@ export async function intelligentEnrichment(report, originalSources, model) {
             return [];
         }
         
-        const prompt = `${enrichPrompt.role}
+        // Build content parts with all available data sources
+        const contentParts = [
+            { text: `${enrichPrompt.role}
 
 增强策略：
 ${enrichPrompt.searchStrategy.map((strategy, i) => `${i + 1}. ${strategy}`).join('\n')}
 
 当前报告:
-${report.substring(0, 8000)}
+${report}
 
-原始资料:
-${originalSources.substring(0, 5000)}
+原始访谈记录:
+${transcript}
 
-请按照以下格式输出增强内容：
-${JSON.stringify(enrichPrompt.outputFormat, null, 2)}`;
+商业计划书分析:
+${businessPlanAnalysis || '无商业计划书数据'}` }
+        ];
         
-        const result = await generateWithThinking(prompt, model, 'Find additional relevant information to enrich the report');
+        // Add uploaded files as enrichment sources
+        if (fileUris && fileUris.length > 0) {
+            contentParts.push({ text: '\n\n**原始文档用于深度增强:**' });
+            fileUris.forEach(file => {
+                if (file.content) {
+                    // For local TXT files
+                    contentParts.push({ text: `\n文档：${file.displayName}\n${file.content}` });
+                } else {
+                    // For uploaded files
+                    contentParts.push({
+                        fileData: {
+                            mimeType: file.mimeType,
+                            fileUri: file.uri
+                        }
+                    });
+                }
+            });
+        }
+        
+        contentParts.push({ text: `\n\n请按照以下格式输出增强内容：\n${JSON.stringify(enrichPrompt.outputFormat, null, 2)}` });
+        
+        const result = await generateWithThinking(contentParts, model, 'Find additional relevant information from all sources to enrich the report');
         
         try {
             return JSON.parse(result);
@@ -288,7 +389,7 @@ ${JSON.stringify(enrichPrompt.outputFormat, null, 2)}`;
 }
 
 // Enhanced Agent 7: Integration Engine
-export async function integrateEnhancements(report, enrichments, model) {
+export async function integrateEnhancements(report, enrichments, transcript, businessPlanAnalysis, fileUris, model) {
     try {
         const prompts = await loadEnhancedPrompts();
         const integratePrompt = prompts.integrateEnhancements;
@@ -298,7 +399,9 @@ export async function integrateEnhancements(report, enrichments, model) {
             return report;
         }
         
-        const prompt = `${integratePrompt.role}
+        // Build content parts with context for better integration
+        const contentParts = [
+            { text: `${integratePrompt.role}
 
 整合原则：
 ${integratePrompt.integrationRules.map((principle, i) => `${i + 1}. ${principle}`).join('\n')}
@@ -309,9 +412,35 @@ ${report}
 增强内容:
 ${JSON.stringify(enrichments, null, 2)}
 
-请输出整合后的完整报告：`;
+原始访谈记录（用于上下文理解）:
+${transcript}
+
+商业计划书分析（用于一致性检查）:
+${businessPlanAnalysis || '无商业计划书数据'}` }
+        ];
         
-        const result = await generateWithThinking(prompt, model, 'Integrate enhancements into the main report');
+        // Add uploaded files for integration context
+        if (fileUris && fileUris.length > 0) {
+            contentParts.push({ text: '\n\n**原始文档用于整合参考:**' });
+            fileUris.forEach(file => {
+                if (file.content) {
+                    // For local TXT files
+                    contentParts.push({ text: `\n文档：${file.displayName}\n${file.content}` });
+                } else {
+                    // For uploaded files
+                    contentParts.push({
+                        fileData: {
+                            mimeType: file.mimeType,
+                            fileUri: file.uri
+                        }
+                    });
+                }
+            });
+        }
+        
+        contentParts.push({ text: '\n\n请输出整合后的完整报告：' });
+        
+        const result = await generateWithThinking(contentParts, model, 'Integrate enhancements with full context from all sources');
         return result;
         
     } catch (error) {
@@ -321,7 +450,7 @@ ${JSON.stringify(enrichments, null, 2)}
 }
 
 // Enhanced Agent 8: Excellence Formatter
-export async function excellenceFormatter(report, model) {
+export async function excellenceFormatter(report, transcript, businessPlanAnalysis, fileUris, model) {
     try {
         const prompts = await loadEnhancedPrompts();
         const formatPrompt = prompts.excellenceFormatter;
@@ -331,7 +460,9 @@ export async function excellenceFormatter(report, model) {
             return report;
         }
         
-        const prompt = `${formatPrompt.role}
+        // Build content parts with context for informed formatting
+        const contentParts = [
+            { text: `${formatPrompt.role}
 
 格式化标准：
 ${formatPrompt.formattingRules.map((rule, i) => `${i + 1}. ${rule}`).join('\n')}
@@ -339,9 +470,35 @@ ${formatPrompt.formattingRules.map((rule, i) => `${i + 1}. ${rule}`).join('\n')}
 当前报告:
 ${report}
 
-请输出专业格式化后的报告：`;
+原始访谈记录（用于上下文理解）:
+${transcript}
+
+商业计划书分析（用于结构参考）:
+${businessPlanAnalysis || '无商业计划书数据'}` }
+        ];
         
-        const result = await generateWithThinking(prompt, model, 'Format the report to professional standards');
+        // Add uploaded files for formatting context
+        if (fileUris && fileUris.length > 0) {
+            contentParts.push({ text: '\n\n**原始文档用于格式参考:**' });
+            fileUris.forEach(file => {
+                if (file.content) {
+                    // For local TXT files
+                    contentParts.push({ text: `\n文档：${file.displayName}\n${file.content}` });
+                } else {
+                    // For uploaded files
+                    contentParts.push({
+                        fileData: {
+                            mimeType: file.mimeType,
+                            fileUri: file.uri
+                        }
+                    });
+                }
+            });
+        }
+        
+        contentParts.push({ text: '\n\n请输出专业格式化后的报告：' });
+        
+        const result = await generateWithThinking(contentParts, model, 'Format the report with full context understanding');
         return result;
         
     } catch (error) {
@@ -351,7 +508,7 @@ ${report}
 }
 
 // Enhanced Agent 9: Final Quality Inspector
-export async function finalQualityInspection(report, model) {
+export async function finalQualityInspection(report, transcript, businessPlanAnalysis, fileUris, model) {
     try {
         const prompts = await loadEnhancedPrompts();
         const inspectPrompt = prompts.finalQualityInspection;
@@ -361,7 +518,9 @@ export async function finalQualityInspection(report, model) {
             return { quality: "检查完成", pass: true };
         }
         
-        const prompt = `${inspectPrompt.role}
+        // Build content parts with all available data for comprehensive inspection
+        const contentParts = [
+            { text: `${inspectPrompt.role}
 
 检查清单：
 ${inspectPrompt.inspectionChecklist.map((item, i) => `${i + 1}. ${item}`).join('\n')}
@@ -370,12 +529,37 @@ ${inspectPrompt.inspectionChecklist.map((item, i) => `${i + 1}. ${item}`).join('
 ${inspectPrompt.outputFormat}
 
 报告内容:
-${report.substring(0, 10000)}
+${report}
 
-请按照以下格式输出检查结果：
-${inspectPrompt.outputFormat}`;
+原始访谈记录（用于完整性检查）:
+${transcript}
+
+商业计划书分析（用于一致性检查）:
+${businessPlanAnalysis || '无商业计划书数据'}` }
+        ];
         
-        const result = await generateWithThinking(prompt, model, 'Perform final quality inspection of the report');
+        // Add uploaded files for final cross-verification
+        if (fileUris && fileUris.length > 0) {
+            contentParts.push({ text: '\n\n**原始文档用于最终检查:**' });
+            fileUris.forEach(file => {
+                if (file.content) {
+                    // For local TXT files
+                    contentParts.push({ text: `\n文档：${file.displayName}\n${file.content}` });
+                } else {
+                    // For uploaded files
+                    contentParts.push({
+                        fileData: {
+                            mimeType: file.mimeType,
+                            fileUri: file.uri
+                        }
+                    });
+                }
+            });
+        }
+        
+        contentParts.push({ text: `\n\n请按照以下格式输出检查结果：\n${inspectPrompt.outputFormat}` });
+        
+        const result = await generateWithThinking(contentParts, model, 'Perform comprehensive final quality inspection');
         
         try {
             return JSON.parse(result);

@@ -91,6 +91,13 @@
         <!-- Process Visualization Section -->
         <div class="process-visualization" id="processVisualization" style="display: none;">
             <div class="process-section">
+                <h2>📄 商业计划书分析</h2>
+                <div class="process-content" id="businessPlanData">
+                    <p style="color: #999; text-align: center; padding: 20px;">商业计划书分析结果将显示在这里...</p>
+                </div>
+            </div>
+
+            <div class="process-section">
                 <h2>📋 提取的信息</h2>
                 <div class="process-content" id="extractedInfo">
                     <p style="color: #999; text-align: center; padding: 20px;">提取的信息将显示在这里...</p>
@@ -119,6 +126,23 @@
             </div>
         </div>
 
+    <!-- Modal for expanded content view -->
+    <div id="contentModal" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2 id="modalTitle">完整内容</h2>
+                <span class="close-btn" onclick="closeModal()">&times;</span>
+            </div>
+            <div class="modal-body" id="modalBody">
+                <!-- Content will be inserted here -->
+            </div>
+            <div class="modal-footer">
+                <button onclick="copyModalContent()" class="copy-btn">复制内容</button>
+                <button onclick="closeModal()" class="close-modal-btn">关闭</button>
+            </div>
+        </div>
+    </div>
+    
     <script type="module" src="main.js"></script>
 </body>
 </html>

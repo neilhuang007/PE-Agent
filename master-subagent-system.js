@@ -1,5 +1,58 @@
 // Master-SubAgent System - Quote-based targeted enhancement
 
+// Retry configuration for handling API errors
+const MAX_RETRIES = 3;
+const INITIAL_DELAY = 2000; // 2 seconds
+const BACKOFF_MULTIPLIER = 2;
+
+// Helper function to sleep
+function sleep(ms) {
+    return new Promise(resolve => setTimeout(resolve, ms));
+}
+
+// Retry wrapper for API calls
+async function retryWithBackoff(apiCall, maxRetries = MAX_RETRIES) {
+    let lastError;
+    
+    for (let attempt = 0; attempt < maxRetries; attempt++) {
+        try {
+            return await apiCall();
+        } catch (error) {
+            lastError = error;
+            
+            // Check if it's a 503 overload error
+            if (error.status === 503 || 
+                error.code === 503 || 
+                (error.message && error.message.includes('overloaded')) ||
+                (error.message && error.message.includes('503'))) {
+                
+                const delay = INITIAL_DELAY * Math.pow(BACKOFF_MULTIPLIER, attempt);
+                console.log(`⚠️ Model overloaded (attempt ${attempt + 1}/${maxRetries}). Retrying in ${delay}ms...`);
+                await sleep(delay);
+                continue;
+            }
+            
+            // Check for rate limit errors
+            if (error.status === 429 || 
+                error.code === 429 || 
+                (error.message && error.message.includes('rate limit'))) {
+                
+                const delay = INITIAL_DELAY * Math.pow(BACKOFF_MULTIPLIER, attempt) * 2; // Longer delay for rate limits
+                console.log(`⚠️ Rate limit hit (attempt ${attempt + 1}/${maxRetries}). Retrying in ${delay}ms...`);
+                await sleep(delay);
+                continue;
+            }
+            
+            // For other errors, throw immediately
+            throw error;
+        }
+    }
+    
+    // If all retries failed, throw the last error
+    console.error(`❌ All ${maxRetries} retry attempts failed`);
+    throw lastError;
+}
+
 export async function identifyEnhancementTasks(report, model) {
     const prompt = `你是一位顶级的投资分析师和报告质量专家。请分析以下PE访谈报告，识别需要深度增强的具体内容片段。
 
@@ -45,7 +98,9 @@ ${report}
 - 每个引用片段长度在50-300字之间为宜`;
 
     try {
-        const result = await model.generateContent(prompt);
+        const result = await retryWithBackoff(async () => {
+            return await model.generateContent(prompt);
+        });
         const text = result.response.text();
         const jsonMatch = text.match(/\{[\s\S]*\}/);
         if (jsonMatch) {
@@ -120,7 +175,9 @@ ${transcript}` }
 增强后的内容：` });
 
     try {
-        const result = await model.generateContent(contentParts);
+        const result = await retryWithBackoff(async () => {
+            return await model.generateContent(contentParts);
+        });
         return {
             task_id: task.task_id,
             original_quote: task.original_quote,

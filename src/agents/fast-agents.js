@@ -1,6 +1,59 @@
 // Fast agents optimized for speed while maintaining quality
 // These agents use more concise prompts and focus on essential information extraction
 
+// Retry configuration for handling API errors
+const MAX_RETRIES = 3;
+const INITIAL_DELAY = 2000; // 2 seconds
+const BACKOFF_MULTIPLIER = 2;
+
+// Helper function to sleep
+function sleep(ms) {
+    return new Promise(resolve => setTimeout(resolve, ms));
+}
+
+// Retry wrapper for API calls
+async function retryWithBackoff(apiCall, maxRetries = MAX_RETRIES) {
+    let lastError;
+    
+    for (let attempt = 0; attempt < maxRetries; attempt++) {
+        try {
+            return await apiCall();
+        } catch (error) {
+            lastError = error;
+            
+            // Check if it's a 503 overload error
+            if (error.status === 503 || 
+                error.code === 503 || 
+                (error.message && error.message.includes('overloaded')) ||
+                (error.message && error.message.includes('503'))) {
+                
+                const delay = INITIAL_DELAY * Math.pow(BACKOFF_MULTIPLIER, attempt);
+                console.log(`⚠️ Model overloaded (attempt ${attempt + 1}/${maxRetries}). Retrying in ${delay}ms...`);
+                await sleep(delay);
+                continue;
+            }
+            
+            // Check for rate limit errors
+            if (error.status === 429 || 
+                error.code === 429 || 
+                (error.message && error.message.includes('rate limit'))) {
+                
+                const delay = INITIAL_DELAY * Math.pow(BACKOFF_MULTIPLIER, attempt) * 2; // Longer delay for rate limits
+                console.log(`⚠️ Rate limit hit (attempt ${attempt + 1}/${maxRetries}). Retrying in ${delay}ms...`);
+                await sleep(delay);
+                continue;
+            }
+            
+            // For other errors, throw immediately
+            throw error;
+        }
+    }
+    
+    // If all retries failed, throw the last error
+    console.error(`❌ All ${maxRetries} retry attempts failed`);
+    throw lastError;
+}
+
 // Load prompts from centralized JSON files
 let fastPrompts = null;
 
@@ -19,7 +72,7 @@ async function loadFastPrompts() {
 }
 
 // Fast Agent 1: Quick Information Extraction - Optimized for Speed and Accuracy
-export async function fastExtractChunk(chunk, index, model) {
+export async function fastExtractChunk(chunk, index, businessPlanContext, model) {
     console.log(`FastExtractChunk ${index + 1} input:`, chunk.substring(0, 100) + '...'); // Debug log
     
     try {
@@ -37,12 +90,16 @@ ${extractPrompt.task}
 
 片段 ${index + 1}: ${chunk}
 
+${businessPlanContext ? `商业计划书关键信息（用于理解上下文）:\n${businessPlanContext.substring(0, 800)}...\n` : ''}
+
 重点提取：
 ${extractPrompt.extractionFocus.map(focus => `• ${focus}`).join('\n')}
 
 ${extractPrompt.outputFormat}`;
 
-        const result = await model.generateContent(prompt);
+        const result = await retryWithBackoff(async () => {
+            return await model.generateContent(prompt);
+        });
         const extractedText = result.response.text();
         console.log(`FastExtractChunk ${index + 1} result:`, extractedText.substring(0, 150) + '...'); // Debug log
         return extractedText;
@@ -82,7 +139,9 @@ ${JSON.stringify(organizePrompt.organizationStructure, null, 2)}
 
 ${organizePrompt.outputFormat}`;
 
-        const result = await model.generateContent(prompt);
+        const result = await retryWithBackoff(async () => {
+            return await model.generateContent(prompt);
+        });
         const text = result.response.text();
         console.log('FastOrganize raw response:', text); // Debug log
         
@@ -156,7 +215,9 @@ ${composePrompt.outputFormat}`;
 
         console.log('FastComposeReport prompt:', prompt.substring(0, 500) + '...'); // Debug log
 
-        const result = await model.generateContent(prompt);
+        const result = await retryWithBackoff(async () => {
+            return await model.generateContent(prompt);
+        });
         const reportText = result.response.text();
         
         console.log('FastComposeReport raw result:', reportText.substring(0, 200) + '...'); // Debug log
@@ -174,8 +235,8 @@ ${composePrompt.outputFormat}`;
     }
 }
 
-// Fast Agent 4: Quick Quality Check - Streamlined
-export async function fastQualityCheck(report, model) {
+// Fast Agent 4: Quick Quality Check - Streamlined but with context
+export async function fastQualityCheck(report, transcript, businessPlanAnalysis, model) {
     try {
         const prompts = await loadFastPrompts();
         const qualityPrompt = prompts.fastQualityCheck;
@@ -189,14 +250,23 @@ export async function fastQualityCheck(report, model) {
 
 ${qualityPrompt.task}
 
-${report.substring(0, 2000)}...
+报告内容：
+${report}
+
+原始访谈记录（用于完整性检查）：
+${transcript.substring(0, 1000)}...
+
+商业计划书分析（用于一致性检查）：
+${businessPlanAnalysis ? businessPlanAnalysis.substring(0, 1000) : '无商业计划书数据'}...
 
 评估标准：
 ${qualityPrompt.evaluationCriteria.map(criteria => `- ${criteria}`).join('\n')}
 
 ${qualityPrompt.outputFormat}`;
 
-        const result = await model.generateContent(prompt);
+        const result = await retryWithBackoff(async () => {
+            return await model.generateContent(prompt);
+        });
         const text = result.response.text();
         const jsonMatch = text.match(/\{[\s\S]*\}/);
         if (jsonMatch) {
@@ -231,7 +301,9 @@ ${formatPrompt.formattingRequirements.map(req => `- ${req}`).join('\n')}
 
 ${formatPrompt.outputFormat}`;
 
-        const result = await model.generateContent(prompt);
+        const result = await retryWithBackoff(async () => {
+            return await model.generateContent(prompt);
+        });
         return result.response.text();
     } catch (error) {
         console.error('Error in fastFormatReport:', error);

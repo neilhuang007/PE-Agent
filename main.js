@@ -75,6 +75,7 @@ async function generateReport(e) {
         
         // Visualization elements
         const processVisualization = document.getElementById('processVisualization');
+        const businessPlanDataDiv = document.getElementById('businessPlanData');
         const extractedInfoDiv = document.getElementById('extractedInfo');
         const initialDraftDiv = document.getElementById('initialDraft');
         const subagentTasksDiv = document.getElementById('subagentTasks');
@@ -88,15 +89,25 @@ async function generateReport(e) {
         // Step 1: Use already uploaded files (files are processed immediately when selected)
         updateProgress(10, `使用已上传的 ${allUploadedFiles.length} 个文档开始分析...`);
         
-        // Step 2: Document Analysis (parallel with transcript processing)
-        let businessPlanAnalysisPromise = null;
+        // Step 2: Document Analysis FIRST (wait for completion before chunk extraction)
+        let businessPlanAnalysis = '';
         if (allUploadedFiles.length > 0) {
-            updateProgress(20, '正在启动文档分析...');
-            // Start BP analysis
-            businessPlanAnalysisPromise = comprehensiveBPAnalysis(allUploadedFiles, model);
+            updateProgress(20, '📄 正在深度分析商业计划书和文档...');
+            try {
+                businessPlanAnalysis = await comprehensiveBPAnalysis(allUploadedFiles, model);
+                updateProgress(25, '✅ 商业计划书分析完成');
+                
+                // Display business plan analysis if visualization is enabled
+                if (showProcessDetails && businessPlanAnalysis) {
+                    displayBusinessPlanData(businessPlanAnalysis, businessPlanDataDiv);
+                }
+            } catch (error) {
+                console.error('商业计划书分析失败:', error);
+                updateProgress(25, '⚠️ 商业计划书分析失败，继续处理');
+            }
         }
         
-        // Step 3: Choose workflow based on mode
+        // Step 3: NOW chunk and extract with BP context available
         updateProgress(30, isSpeedMode ? '⚡ 快速模式：优化处理流程...' : '🔍 开始深度分析访谈内容...');
         const chunks = chunkTranscript(transcript);
         updateProgress(35, `已将访谈内容分成${chunks.length}个片段`, 
@@ -108,10 +119,10 @@ async function generateReport(e) {
             // FAST MODE: Streamlined workflow for speed while maintaining accuracy
             updateProgress(40, '⚡ 快速并行信息提取...');
             
-            // Use faster extraction method with focus on key information
+            // Use faster extraction method with BP context
             const fastExtractionPromises = chunks.map(async (chunk, i) => {
                 try {
-                    return await fastExtractChunk(chunk, i, model);
+                    return await fastExtractChunk(chunk, i, businessPlanAnalysis, model);
                 } catch (error) {
                     console.error(`Error in fast processing chunk ${i + 1}:`, error);
                     return `片段 ${i + 1} 快速处理失败: ${error.message}`;
@@ -128,10 +139,8 @@ async function generateReport(e) {
             
             // Fast organization and report generation
             updateProgress(60, '⚡ 快速信息整理...');
-            const businessPlanText = businessPlanAnalysisPromise ? await businessPlanAnalysisPromise : '';
-            const combinedDocumentInfo = businessPlanText || '';
             
-            organizedInfo = await fastOrganizeInformation(extractedChunks, combinedDocumentInfo, model);
+            organizedInfo = await fastOrganizeInformation(extractedChunks, businessPlanAnalysis, model);
             updateProgress(70, '⚡ 生成初始报告...');
             currentReport = await fastComposeReport(organizedInfo, companyName, model);
             
@@ -143,7 +152,7 @@ async function generateReport(e) {
             // Fast quality and formatting pipeline (no subagent enhancement for speed)
             updateProgress(85, '⚡ 快速质量检查和格式化...');
             const [qualityResult, formattedReport] = await Promise.all([
-                fastQualityCheck(currentReport, model),
+                fastQualityCheck(currentReport, transcript, businessPlanAnalysis, model),
                 detectAndRemoveBias(currentReport, model).then(debiased => 
                     fastFormatReport(debiased, model)
                 )
@@ -169,7 +178,7 @@ async function generateReport(e) {
             
             const extractionPromises = chunks.map(async (chunk, i) => {
                 try {
-                    return await deepExtractChunk(chunk, i, transcript, allUploadedFiles, model);
+                    return await deepExtractChunk(chunk, i, transcript, businessPlanAnalysis, allUploadedFiles, model);
                 } catch (error) {
                     console.error(`Error processing chunk ${i + 1}:`, error);
                     return `片段 ${i + 1} 处理失败: ${error.message}`;
@@ -186,7 +195,6 @@ async function generateReport(e) {
             
             // Generate initial enhanced report
             updateProgress(58, '📊 生成增强模式初始报告...');
-            const businessPlanAnalysis = businessPlanAnalysisPromise ? await businessPlanAnalysisPromise : '';
             const enhancedInfoSources = [businessPlanAnalysis].filter(Boolean).join('\n\n');
             
             organizedInfo = await architectInformation(extractedChunks, enhancedInfoSources, allUploadedFiles, model);
@@ -221,6 +229,27 @@ async function generateReport(e) {
             // Set architecturedInfo for technical terms
             architecturedInfo = organizedInfo;
             
+            // Enhanced Verification and Quality Control
+            updateProgress(80, '🔍 深度验证和质量控制...');
+            try {
+                // Citation Verification with all data sources
+                const citationVerification = await verifyCitations(currentReport, transcript, businessPlanAnalysis, allUploadedFiles, model);
+                if (!citationVerification.verified && citationVerification.issues?.length > 0) {
+                    console.warn('⚠️ 引用验证发现问题:', citationVerification.issues);
+                }
+                
+                // Excellence Validation with comprehensive data
+                const excellenceValidation = await validateExcellence(currentReport, transcript, businessPlanAnalysis, allUploadedFiles, model);
+                if (excellenceValidation.score < 80) {
+                    console.warn('⚠️ 质量评分较低:', excellenceValidation.score);
+                }
+                
+                updateProgress(85, `✅ 验证完成 - 质量评分: ${excellenceValidation.score || 'N/A'}/100`);
+            } catch (error) {
+                console.error('验证过程出错:', error);
+                updateProgress(85, '⚠️ 验证过程出错，继续处理');
+            }
+            
             // Bias Detection and Professional Formatting
             updateProgress(90, '正在进行偏向性检测和专业格式化...');
             try {
@@ -231,7 +260,7 @@ async function generateReport(e) {
                     console.warn('⚠️ 偏向性检测失败，保持原报告');
                 }
                 
-                const formattedReport = await excellenceFormatter(currentReport, model);
+                const formattedReport = await excellenceFormatter(currentReport, transcript, businessPlanAnalysis, allUploadedFiles, model);
                 if (formattedReport && typeof formattedReport === 'string') {
                     currentReport = formattedReport;
                 } else {
@@ -243,7 +272,7 @@ async function generateReport(e) {
             }
             
             // Final professional formatting
-            updateProgress(97, '📝 最终专业格式化...');
+            updateProgress(95, '📝 最终专业格式化...');
             try {
                 const finalFormattedReport = await finalReportFormatter(currentReport, model);
                 if (finalFormattedReport && typeof finalFormattedReport === 'string') {
@@ -254,7 +283,18 @@ async function generateReport(e) {
                 console.log('保持当前报告继续');
             }
             
-            updateProgress(98, '✅ 增强模式处理完成');
+            // Final Quality Inspection with all sources
+            updateProgress(97, '🔍 最终质量检查...');
+            try {
+                const finalQualityResult = await finalQualityInspection(currentReport, transcript, businessPlanAnalysis, allUploadedFiles, model);
+                if (!finalQualityResult.pass) {
+                    console.warn('⚠️ 最终质量检查未通过:', finalQualityResult.quality);
+                }
+                updateProgress(98, `✅ 增强模式处理完成 - 最终质量: ${finalQualityResult.pass ? '通过' : '需改进'}`);
+            } catch (error) {
+                console.error('最终质量检查出错:', error);
+                updateProgress(98, '✅ 增强模式处理完成');
+            }
         }
         
         // Safety check for currentReport
@@ -402,15 +442,68 @@ function addMoreFiles() {
     document.getElementById('pdfs').click();
 }
 
+// Store full content for modal display
+window.fullContentStore = {
+    extractedInfo: [],
+    businessPlanData: '',
+    initialDraft: '',
+    subagentTasks: null,
+    enhancementDetails: []
+};
+
+// Modal functions
+window.showModal = function(title, content) {
+    const modal = document.getElementById('contentModal');
+    const modalTitle = document.getElementById('modalTitle');
+    const modalBody = document.getElementById('modalBody');
+    
+    modalTitle.textContent = title;
+    // Properly escape HTML content
+    const pre = document.createElement('pre');
+    pre.textContent = content;
+    modalBody.innerHTML = '';
+    modalBody.appendChild(pre);
+    modal.style.display = 'block';
+}
+
+window.closeModal = function() {
+    const modal = document.getElementById('contentModal');
+    modal.style.display = 'none';
+}
+
+window.copyModalContent = function() {
+    const modalBody = document.getElementById('modalBody');
+    const content = modalBody.textContent;
+    
+    navigator.clipboard.writeText(content).then(() => {
+        alert('内容已复制到剪贴板');
+    }).catch(err => {
+        console.error('复制失败:', err);
+    });
+}
+
+// Close modal when clicking outside
+window.onclick = function(event) {
+    const modal = document.getElementById('contentModal');
+    if (event.target === modal) {
+        closeModal();
+    }
+}
+
 // Visualization functions
 function displayExtractedInfo(extractedChunks, container) {
+    // Store full content
+    window.fullContentStore.extractedInfo = extractedChunks;
+    
     let html = '<h3>📋 提取的信息详情</h3>';
+    html += '<p class="clickable-hint">点击任何卡片查看完整内容</p>';
     
     extractedChunks.forEach((chunk, index) => {
         html += `
-            <div class="info-item">
+            <div class="info-item" onclick="showModal('片段 ${index + 1} - 完整内容', window.fullContentStore.extractedInfo[${index}])">
                 <h4>片段 ${index + 1}</h4>
                 <pre>${chunk.substring(0, 800)}${chunk.length > 800 ? '...' : ''}</pre>
+                ${chunk.length > 800 ? '<p style="text-align: right; color: #007bff; font-size: 0.9em;">点击查看全部 →</p>' : ''}
             </div>
         `;
     });
@@ -418,15 +511,46 @@ function displayExtractedInfo(extractedChunks, container) {
     container.innerHTML = html;
 }
 
+function displayBusinessPlanData(businessPlanAnalysis, container) {
+    if (!businessPlanAnalysis || businessPlanAnalysis.length === 0) {
+        container.innerHTML = '<h3>📄 商业计划书分析</h3><p>无商业计划书数据</p>';
+        return;
+    }
+    
+    // Store full content
+    window.fullContentStore.businessPlanData = businessPlanAnalysis;
+    
+    const html = `
+        <h3>📄 商业计划书分析结果</h3>
+        <p class="clickable-hint">点击卡片查看完整内容</p>
+        <div class="stats">
+            <span class="stat-item">数据长度: ${businessPlanAnalysis.length} 字符</span>
+            <span class="stat-item">处理时间: ${new Date().toLocaleTimeString()}</span>
+        </div>
+        <div class="info-item" onclick="showModal('商业计划书分析 - 完整内容', window.fullContentStore.businessPlanData)">
+            <h4>提取的商业计划书内容</h4>
+            <pre>${businessPlanAnalysis.substring(0, 2000)}${businessPlanAnalysis.length > 2000 ? '...\n\n[显示前2000字符，完整内容已用于报告生成]' : ''}</pre>
+            ${businessPlanAnalysis.length > 2000 ? '<p style="text-align: right; color: #007bff; font-size: 0.9em;">点击查看全部 →</p>' : ''}
+        </div>
+    `;
+    
+    container.innerHTML = html;
+}
+
 function displayInitialDraft(report, container) {
+    // Store full content
+    window.fullContentStore.initialDraft = report;
+    
     const html = `
         <h3>📝 初始报告草稿</h3>
+        <p class="clickable-hint">点击查看完整报告</p>
         <div class="stats">
             <span class="stat-item">长度: ${report.length} 字符</span>
             <span class="stat-item">生成时间: ${new Date().toLocaleTimeString()}</span>
         </div>
-        <div class="process-content">
-            ${formatForDisplay(report)}
+        <div class="process-content info-item" onclick="showModal('初始报告草稿 - 完整内容', window.fullContentStore.initialDraft)" style="cursor: pointer;">
+            ${formatForDisplay(report.substring(0, 2000) + (report.length > 2000 ? '...' : ''))}
+            ${report.length > 2000 ? '<p style="text-align: right; color: #007bff; font-size: 0.9em; margin-top: 10px;">点击查看完整报告 →</p>' : ''}
         </div>
     `;
     
@@ -434,7 +558,11 @@ function displayInitialDraft(report, container) {
 }
 
 function displaySubagentTasks(tasks, container) {
+    // Store full content
+    window.fullContentStore.subagentTasks = tasks;
+    
     let html = '<h3>🎯 子代理任务详情</h3>';
+    html += '<p class="clickable-hint">点击任务卡片查看完整内容</p>';
     
     if (!tasks || !tasks.enhancement_tasks) {
         html += '<p>暂无子代理任务</p>';
@@ -451,15 +579,16 @@ function displaySubagentTasks(tasks, container) {
     
     tasks.enhancement_tasks.forEach((task, index) => {
         html += `
-            <div class="task-item">
+            <div class="task-item" onclick="showModal('任务 ${index + 1}: ${task.research_task}', JSON.stringify(window.fullContentStore.subagentTasks.enhancement_tasks[${index}], null, 2))">
                 <h4>任务 ${index + 1}: ${task.research_task}</h4>
                 <p><strong>优先级:</strong> ${task.priority}</p>
                 <p><strong>增强重点:</strong> ${task.enhancement_focus}</p>
                 <p><strong>期望改进:</strong> ${task.expected_improvement}</p>
                 <div class="original-quote">
                     <div class="quote-label">原始片段:</div>
-                    ${task.original_quote}
+                    ${task.original_quote.substring(0, 200)}${task.original_quote.length > 200 ? '...' : ''}
                 </div>
+                ${task.original_quote.length > 200 ? '<p style="text-align: right; color: #007bff; font-size: 0.9em;">点击查看全部 →</p>' : ''}
             </div>
         `;
     });
@@ -468,7 +597,11 @@ function displaySubagentTasks(tasks, container) {
 }
 
 function displayEnhancementDetails(enhancementResults, container) {
+    // Store full content
+    window.fullContentStore.enhancementDetails = enhancementResults;
+    
     let html = '<h3>🔄 增强替换详情</h3>';
+    html += '<p class="clickable-hint">点击对比卡片查看完整内容</p>';
     
     if (!enhancementResults || enhancementResults.length === 0) {
         html += '<p>暂无增强详情</p>';
@@ -485,18 +618,24 @@ function displayEnhancementDetails(enhancementResults, container) {
             totalReplacements++;
         }
         
+        // Create a function to show the comparison
+        window[`showComparison${index}`] = function() {
+            const fullComparison = `原始内容 (${result.original_quote.length} 字符):\n${'-'.repeat(50)}\n${result.original_quote}\n\n增强内容 (${result.enhanced_content.length} 字符):\n${'-'.repeat(50)}\n${result.enhanced_content}\n\n改进详情:\n${'-'.repeat(50)}\n研究任务: ${result.research_task}\n优先级: ${result.priority}\n字符变化: ${improvement > 0 ? '+' : ''}${improvement}${result.error ? '\n错误: ' + result.error : ''}`;
+            showModal(`增强任务 ${index + 1}: ${result.research_task}`, fullComparison);
+        };
+        
         html += `
-            <div class="quote-comparison">
+            <div class="quote-comparison" onclick="showComparison${index}()">
                 <h4>增强任务 ${index + 1}: ${result.research_task}</h4>
                 
                 <div class="original-quote">
                     <div class="quote-label">原始内容 (${result.original_quote.length} 字符):</div>
-                    ${result.original_quote}
+                    ${result.original_quote.substring(0, 300)}${result.original_quote.length > 300 ? '...' : ''}
                 </div>
                 
                 <div class="enhanced-quote">
                     <div class="quote-label">增强内容 (${result.enhanced_content.length} 字符):</div>
-                    ${result.enhanced_content}
+                    ${result.enhanced_content.substring(0, 300)}${result.enhanced_content.length > 300 ? '...' : ''}
                 </div>
                 
                 <div class="stats">
@@ -506,6 +645,7 @@ function displayEnhancementDetails(enhancementResults, container) {
                     <span class="stat-item">优先级: ${result.priority}</span>
                     ${result.error ? `<span class="stat-item" style="background-color: #f8d7da; color: #721c24;">错误: ${result.error}</span>` : ''}
                 </div>
+                ${(result.original_quote.length > 300 || result.enhanced_content.length > 300) ? '<p style="text-align: right; color: #007bff; font-size: 0.9em;">点击查看完整对比 →</p>' : ''}
             </div>
         `;
     });
