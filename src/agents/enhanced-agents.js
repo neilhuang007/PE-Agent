@@ -4,6 +4,7 @@
 
 import { generateWithThinking, generateWithFilesAndThinking } from '../config/gemini-config.js';
 import { compactChineseBullets } from '../utils/utils.js';
+import { initGeminiClient, generateWithRetry, convertContentParts } from '../utils/simple-gemini-wrapper.js';
 
 // Load prompts from centralized JSON files
 let enhancedPrompts = null;
@@ -23,10 +24,11 @@ async function loadEnhancedPrompts() {
 }
 
 // Enhanced Agent 10: Per-File Business Plan Analyzer
-async function analyzeIndividualFile(file, index, model) {
+async function analyzeIndividualFile(file, index, model, genAI) {
+    console.log(`🔍 开始分析文档 ${index + 1}: ${file.displayName}`);
     try {
         const prompts = await loadEnhancedPrompts();
-        let filePrompt = prompts.comprehensiveBPAnalysis?.perFileAnalysis || {
+        let filePrompt = prompts.perFileAnalysis || {
             role: "你是一位专业的文档分析专家，擅长从各种格式的文档中提取结构化信息。",
             extractionFocus: [
                 "1. 表格数据：完整提取所有表格内容，包括行列标题和数据",
@@ -41,7 +43,7 @@ async function analyzeIndividualFile(file, index, model) {
         };
         
         const contentParts = [
-            { text: `${filePrompt.role}\n\n文档 ${index + 1}: ${file.displayName}\n\n请对这个文档进行深度信息提取，特别注意：\n${filePrompt.extractionFocus?.join('\n') || '提取所有重要信息'}\n\n请确保：\n- 完整提取所有表格数据（保持原始格式）\n- 保留所有具体数字和百分比\n- 提取所有人名、公司名、产品名\n- 保持时间顺序和逻辑关系\n\n开始分析：` }
+            { text: `${filePrompt.task}\n\n文档: ${file.displayName}\n\n重点:\n${filePrompt.critical?.map(c => `• ${c}`).join('\n') || '提取所有数据'}\n\n${filePrompt.outputFormat}` }
         ];
         
         if (file.content) {
@@ -57,7 +59,16 @@ async function analyzeIndividualFile(file, index, model) {
             });
         }
         
-        const result = await generateWithThinking(contentParts, model, 'Extract all structured data including tables, charts, and key information');
+        // Use the new TypeScript wrapper if genAI is available, otherwise fall back to old method
+        let result;
+        if (genAI) {
+            const convertedParts = convertContentParts(contentParts);
+            result = await generateWithRetry(convertedParts, filePrompt.role, -1); // Use dynamic thinking
+        } else {
+            result = await generateWithThinking(contentParts, model, 'Extract all structured data including tables, charts, and key information');
+        }
+        
+        console.log(`✅ 文档 ${file.displayName} 分析成功 - 提取长度: ${result?.length || 0} 字符`);
         
         return {
             fileName: file.displayName,
@@ -67,131 +78,52 @@ async function analyzeIndividualFile(file, index, model) {
         };
         
     } catch (error) {
-        console.error(`Error analyzing file ${file.displayName}:`, error);
+        console.error(`❌ 文档 ${file.displayName} 分析失败:`, error);
         return {
             fileName: file.displayName,
             mimeType: file.mimeType,
-            extractedContent: `文件分析失败: ${error.message}`,
-            error: true
+            extractedContent: `文件分析失败: ${error.message}\n\n请检查文件格式和API连接状态。`,
+            error: true,
+            extractionTime: new Date().toISOString()
         };
     }
 }
 
-// Enhanced Agent 10: Comprehensive Business Plan Analyzer (Updated)
-export async function comprehensiveBPAnalysis(fileUris, model) {
+// Simplified Per-File Analysis Only
+export async function comprehensiveBPAnalysis(fileUris, model, genAI = null) {
     if (!fileUris || fileUris.length === 0) {
-        return { fullReport: "无商业计划书可供分析", compactSummary: '', fileSummaries: [] };
+        return { combinedAnalyses: '', fileSummaries: [] };
     }
     
     try {
-        console.log(`🔍 开始分析 ${fileUris.length} 个文档...`);
+        console.log(`🔍 开始per-file分析 ${fileUris.length} 个文档...`);
         
-        // Step 1: Analyze each file individually in parallel
+        // Analyze each file individually in parallel
         const fileAnalysisPromises = fileUris.map((file, index) => 
-            analyzeIndividualFile(file, index, model)
+            analyzeIndividualFile(file, index, model, genAI)
         );
         
         const individualAnalyses = await Promise.all(fileAnalysisPromises);
+        console.log(`✅ Per-file分析完成，共处理了 ${individualAnalyses.length} 个文档`);
         
-        // Log extraction results
-        individualAnalyses.forEach(analysis => {
-            console.log(`✅ 文档 ${analysis.fileName} 分析完成 - 提取内容长度: ${analysis.extractedContent?.length || 0} 字符`);
-        });
-        
-        // Step 2: Synthesize all individual analyses into comprehensive report
-        const prompts = await loadEnhancedPrompts();
-        let synthesisPrompt = prompts.comprehensiveBPAnalysis?.synthesis || {
-            role: "你是一位世界顶级的投资分析专家，擅长整合多源信息生成深度投资分析报告。",
-            task: "基于以下各文档的独立分析结果，生成一份整合性的商业计划书深度分析报告。"
-        };
-        
-        const synthesisContent = `${synthesisPrompt.role}
-
-${synthesisPrompt.task}
-
-已分析的文档及提取结果：
-${individualAnalyses.map((analysis, i) => `
-【文档 ${i + 1}】${analysis.fileName} (${analysis.mimeType})
-提取内容：
+        // Return combined analyses for all other agents to use
+        const fileSummaries = individualAnalyses.map(a => a.extractedContent);
+        const combinedAnalyses = individualAnalyses.map((analysis, i) => `
+【文档 ${i + 1}】${analysis.fileName}
 ${analysis.extractedContent}
-${'='.repeat(80)}
-`).join('\n')}
+${'='.repeat(60)}
+`).join('\n');
 
-请生成整合性分析报告，要求：
-1. 整合所有文档中的关键信息
-2. 突出财务数据和增长指标
-3. 分析商业模式和竞争优势
-4. 评估团队背景和执行能力
-5. 识别潜在风险和机会
-6. 提供投资建议和估值参考
-
-输出格式：
-# 商业计划书综合分析报告
-
-## 1. 公司概况
-[整合所有文档中的公司基本信息]
-
-## 2. 财务分析
-[所有财务数据、表格、增长率等]
-
-## 3. 商业模式
-[收入来源、成本结构、盈利能力]
-
-## 4. 市场分析
-[市场规模、竞争格局、增长潜力]
-
-## 5. 团队评估
-[创始团队、核心成员、背景实力]
-
-## 6. 产品/服务分析
-[产品特点、技术优势、客户价值]
-
-## 7. 风险与机会
-[主要风险、增长机会、护城河]
-
-## 8. 投资建议
-[估值分析、投资亮点、关注点]`;
-        
-        const synthesisResult = await generateWithThinking(synthesisContent, model, 'Synthesize all document analyses into comprehensive investment report');
-
-        // Step 3: Return both individual analyses and synthesis for transparency
-        const fullReport = `${'='.repeat(80)}
-📊 商业计划书分析报告
-${'='.repeat(80)}
-
-📁 分析文档数量: ${fileUris.length}
-⏰ 分析时间: ${new Date().toLocaleString('zh-CN')}
-
-${'='.repeat(80)}
-📋 各文档独立分析结果
-${'='.repeat(80)}
-
-${individualAnalyses.map((analysis, i) => `
-### 文档 ${i + 1}: ${analysis.fileName}
-类型: ${analysis.mimeType}
-分析时间: ${new Date(analysis.extractionTime).toLocaleTimeString('zh-CN')}
-
-${analysis.extractedContent}
-`).join('\n' + '-'.repeat(60) + '\n')}
-
-${'='.repeat(80)}
-📈 综合分析报告
-${'='.repeat(80)}
-
-${synthesisResult}`;
-        const fileSummaries = individualAnalyses.map(a => compactChineseBullets(a.extractedContent));
-        const compactSummary = compactChineseBullets(fileSummaries.join('\n'));
-
-        return { fullReport, compactSummary, fileSummaries };
+        return { combinedAnalyses, fileSummaries };
         
     } catch (error) {
-        console.error('BP analysis error:', error);
-        return "商业计划书分析失败：" + error.message;
+        console.error('Per-file analysis error:', error);
+        return { combinedAnalyses: "Per-file分析失败：" + error.message, fileSummaries: [] };
     }
 }
 
 // Enhanced Agent 1: Deep Information Extraction with Cross-Reference
-export async function deepExtractChunk(chunk, index, transcript, businessPlanAnalysis, fileUris, model) {
+export async function deepExtractChunk(chunk, index, transcript, combinedAnalyses, fileUris, model) {
     try {
         const prompts = await loadEnhancedPrompts();
         const extractPrompt = prompts.deepExtractChunk;
@@ -212,9 +144,9 @@ ${chunk}
 ${transcript.substring(0, 5000)}...
 
 商业计划书分析（用于深度理解和交叉验证）:
-${businessPlanAnalysis ? businessPlanAnalysis.substring(0, 3000) : '无商业计划书数据'}...
+${combinedAnalyses ? combinedAnalyses.substring(0, 3000) : '无商业计划书数据'}...
 
-${extractPrompt.extractionFocus.map((req, i) => `${i + 1}. ${req}`).join('\n')}
+${extractPrompt.focus.map((req, i) => `${i + 1}. ${req}`).join('\n')}
 
 ${extractPrompt.outputFormat}` }
         ];
@@ -263,7 +195,7 @@ export async function architectInformation(extractedChunks, enhancedInfoSources,
 ${archPrompt.task}
 
 组织结构要求:
-${Object.entries(archPrompt.organizationStructure).map(([key, desc], i) => `${i + 1}. ${key}: ${desc}`).join('\n')}
+${Object.entries(archPrompt.sections).map(([key, desc], i) => `${i + 1}. ${key}: ${desc}`).join('\n')}
 
 信息源:
 ${allInfo.substring(0, 15000)}
@@ -320,7 +252,7 @@ ${composePrompt.writingStandards.map((std, i) => `${i + 1}. ${std}`).join('\n')}
 }
 
 // Enhanced Agent 4: Citation Verifier
-export async function verifyCitations(report, transcript, compactSummary, fileSummaries, fileUris, model) {
+export async function verifyCitations(report, transcript, combinedAnalyses, fileSummaries, fileUris, model) {
     try {
         const prompts = await loadEnhancedPrompts();
         const verifyPrompt = prompts.verifyCitations;
@@ -337,7 +269,7 @@ export async function verifyCitations(report, transcript, compactSummary, fileSu
 ${verifyPrompt.checkPoints.map((task, i) => `${i + 1}. ${task}`).join('\n')}
 
 压缩总结:
-${compactSummary}
+${combinedAnalyses}
 
 文件摘要:
 ${fileSummaries.map((fs,i)=>`文件${i+1}: ${fs}`).join('\n')}
@@ -385,7 +317,7 @@ ${transcript}` }
 }
 
 // Enhanced Agent 4b: Cross-validate each fact from summaries
-export async function crossValidateFacts(report, compactSummary, fileSummaries, model) {
+export async function crossValidateFacts(report, combinedAnalyses, fileSummaries, model) {
     try {
         const prompts = await loadEnhancedPrompts();
         const factPrompt = prompts.crossValidateFacts || {
@@ -398,7 +330,7 @@ export async function crossValidateFacts(report, compactSummary, fileSummaries, 
         const extractFacts = text =>
             text ? text.split('\n').map(l => l.replace(/^\s*[•*-]?\s*/, '').trim()).filter(Boolean) : [];
 
-        let facts = extractFacts(compactSummary);
+        let facts = extractFacts(combinedAnalyses);
         if (Array.isArray(fileSummaries)) {
             fileSummaries.forEach(fs => {
                 facts = facts.concat(extractFacts(fs));
@@ -420,7 +352,7 @@ export async function crossValidateFacts(report, compactSummary, fileSummaries, 
 }
 
 // Enhanced Agent 5: Excellence Validator
-export async function validateExcellence(report, transcript, businessPlanAnalysis, fileUris, model) {
+export async function validateExcellence(report, transcript, combinedAnalyses, fileUris, model) {
     try {
         const prompts = await loadEnhancedPrompts();
         const validatePrompt = prompts.validateExcellence;
@@ -447,7 +379,7 @@ ${report}
 ${transcript}
 
 商业计划书分析（用于深度评估）:
-${businessPlanAnalysis || '无商业计划书数据'}` }
+${combinedAnalyses || '无商业计划书数据'}` }
         ];
         
         // Add uploaded files for comprehensive quality assessment
@@ -486,7 +418,7 @@ ${businessPlanAnalysis || '无商业计划书数据'}` }
 }
 
 // Enhanced Agent 6: Intelligent Enrichment
-export async function intelligentEnrichment(report, transcript, businessPlanAnalysis, fileUris, model) {
+export async function intelligentEnrichment(report, transcript, combinedAnalyses, fileUris, model) {
     try {
         const prompts = await loadEnhancedPrompts();
         const enrichPrompt = prompts.intelligentEnrichment;
@@ -510,7 +442,7 @@ ${report}
 ${transcript}
 
 商业计划书分析:
-${businessPlanAnalysis || '无商业计划书数据'}` }
+${combinedAnalyses || '无商业计划书数据'}` }
         ];
         
         // Add uploaded files as enrichment sources
@@ -549,7 +481,7 @@ ${businessPlanAnalysis || '无商业计划书数据'}` }
 }
 
 // Enhanced Agent 7: Integration Engine
-export async function integrateEnhancements(report, enrichments, transcript, businessPlanAnalysis, fileUris, model) {
+export async function integrateEnhancements(report, enrichments, transcript, combinedAnalyses, fileUris, model) {
     try {
         const prompts = await loadEnhancedPrompts();
         const integratePrompt = prompts.integrateEnhancements;
@@ -576,7 +508,7 @@ ${JSON.stringify(enrichments, null, 2)}
 ${transcript}
 
 商业计划书分析（用于一致性检查）:
-${businessPlanAnalysis || '无商业计划书数据'}` }
+${combinedAnalyses || '无商业计划书数据'}` }
         ];
         
         // Add uploaded files for integration context
@@ -610,7 +542,7 @@ ${businessPlanAnalysis || '无商业计划书数据'}` }
 }
 
 // Enhanced Agent 8: Excellence Formatter
-export async function excellenceFormatter(report, transcript, businessPlanAnalysis, fileUris, model) {
+export async function excellenceFormatter(report, transcript, combinedAnalyses, fileUris, model) {
     try {
         const prompts = await loadEnhancedPrompts();
         const formatPrompt = prompts.excellenceFormatter;
@@ -634,7 +566,7 @@ ${report}
 ${transcript}
 
 商业计划书分析（用于结构参考）:
-${businessPlanAnalysis || '无商业计划书数据'}` }
+${combinedAnalyses || '无商业计划书数据'}` }
         ];
         
         // Add uploaded files for formatting context
@@ -668,7 +600,7 @@ ${businessPlanAnalysis || '无商业计划书数据'}` }
 }
 
 // Enhanced Agent 9: Final Quality Inspector
-export async function finalQualityInspection(report, transcript, businessPlanAnalysis, fileUris, model) {
+export async function finalQualityInspection(report, transcript, combinedAnalyses, fileUris, model) {
     try {
         const prompts = await loadEnhancedPrompts();
         const inspectPrompt = prompts.finalQualityInspection;
@@ -695,7 +627,7 @@ ${report}
 ${transcript}
 
 商业计划书分析（用于一致性检查）:
-${businessPlanAnalysis || '无商业计划书数据'}` }
+${combinedAnalyses || '无商业计划书数据'}` }
         ];
         
         // Add uploaded files for final cross-verification

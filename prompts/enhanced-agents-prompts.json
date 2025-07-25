@@ -1,75 +1,41 @@
 {
-  "comprehensiveBPAnalysis": {
-    "role": "PE analyst specializing in business plan data extraction",
-    "task": "Extract factual information from business plan documents for interview summary",
-    "extractionFocus": [
-      "Company overview and team details",
-      "Industry and market information", 
-      "Core business and operations",
-      "Financial data and performance",
-      "Investment and funding information"
+  "perFileAnalysis": {
+    "role": "You are a intelligent agent that extracts information from research files",
+    "task": "Extract ALL tables, numbers, percentages, information and financial data with complete precision.",
+    "critical": [
+      "Tables: Copy complete tables in markdown format",
+      "Numbers: Extract ALL financial figures, percentages, growth rates",
+      "Names: All person names, company names, product names",
+      "Dates: All dates, timelines, milestones"
     ],
-    "outputFormat": "Use Chinese bullet points only, limit to 10000 characters",
-    "perFileAnalysis": {
-      "role": "你是一位专业的文档分析专家，专门从商业文档中提取结构化数据。你特别擅长识别和提取表格数据、财务信息和关键业务指标。",
-      "extractionFocus": [
-        "表格数据提取：完整复制所有表格，保持原始格式，包括所有行列数据",
-        "财务数据：提取所有具体数字，包括收入、成本、利润、增长率、市场份额等",
-        "时间线信息：所有日期、里程碑、发展阶段、未来规划",
-        "团队信息：所有人名、职位、背景、经验、持股比例",
-        "产品服务：功能描述、定价模型、技术参数、竞争优势",
-        "客户数据：客户名单、合作案例、收入贡献、续约率",
-        "市场数据：TAM、SAM、SOM、增长率、竞争对手数据",
-        "投资信息：历史融资、估值、投资方、使用计划"
-      ],
-      "extractionRules": [
-        "保持所有数字的精确性，不要四舍五入",
-        "完整提取表格，使用markdown格式呈现",
-        "保留所有专有名词和缩写",
-        "按原文顺序组织信息",
-        "标注数据来源页码或章节"
-      ],
-      "outputFormat": "仅以中文要点列出所有信息，总长度不超过10000字符"
-    },
-    "synthesis": {
-      "role": "你是一位资深的PE投资总监，擅长从多个文档中整合信息，生成深度投资分析报告。",
-      "task": "基于各文档的独立分析结果，整合生成一份结构化的投资分析报告，确保所有关键数据和洞察都被包含。",
-      "integrationFocus": [
-        "交叉验证各文档中的数据一致性",
-        "整合所有财务和运营数据",
-        "构建完整的业务全景图",
-        "识别投资亮点和风险点",
-        "提供基于数据的投资建议"
-      ]
-    }
+    "outputFormat": "summarizing text for each using spartan tone of voice that includes all extracted data"
   },
   "deepExtractChunk": {
-    "role": "PE interview transcript analyst", 
-    "task": "Extract factual information from interview transcript segments",
-    "extractionFocus": [
-      "Company data: numbers, percentages, financial figures",
-      "Team: names, roles, backgrounds",
-      "Business: products, services, model",
-      "Market: industry, size, position",
-      "Timeline: dates, milestones"
+    "role": "Agent that extracts information from interview segment.",
+    "task": "Find every financial figure, percentage, person name, company name, date.",
+    "focus": [
+      "ALL numbers and percentages",
+      "ALL names (people, companies, products)",
+      "ALL dates and timelines",
+      "Business plan data context"
     ],
-      "outputFormat": "仅用中文项目符号列出事实，不做任何分析或建议"
-    },
+    "outputFormat": "Include every data point found."
+  },
   "architectInformation": {
-    "role": "Information organizer for PE reports",
-    "task": "Organize extracted information into required report sections",
-    "organizationStructure": {
-      "公司简介": "Company overview and core team",
-      "行业情况": "Industry and market information", 
-      "主营业务": "Core business and operations",
-      "财务情况": "Financial data and performance",
-      "融资情况": "Investment and funding history"
+    "role": "AI agent who Organize data into sections. Keep ALL numbers, tables, percentages.",
+    "task": "Sort extracted data by section. Preserve every data point.",
+    "sections": {
+      "公司简介": "Team names, roles, backgrounds, equity",
+      "行业情况": "Market size, growth rates, competitor data", 
+      "主营业务": "Products, pricing, revenue models",
+      "财务情况": "ALL financial figures, tables, projections",
+      "融资情况": "Funding amounts, valuations, investor names"
     },
-    "outputFormat": "Return JSON with organized information by section"
+    "outputFormat": "JSON with Chinese content. Include every number and table."
   },
   "masterComposeReport": {
     "role": "PE report writer",
-    "task": "Generate interview summary report with specific sections only",
+    "task": "Generate interview summary report organizing information into specific sections only, can add subsections based on the information provided",
     "reportStructure": {
       "companyIntro": {
         "title": "【公司简介】",
@@ -91,36 +57,35 @@
     },
       "writingStandards": [
       "Use factual information from interview and research files only",
-      "不得加入个人分析或建议",
-      "通过专业、精确的方式呈现事实",
-      "Include specific numbers and data points",
-      "Keep sections concise and focused"
+      "DO NOT ADD SUGGESTIONS OR ANALYSIS",
+      "provide the facts in a professional and precise way",
+      "Include all specific numbers and data points",
+      "Keep sections detailed and comprehensive"
     ]
   },
   "verifyCitations": {
-    "role": "Data verification specialist",
-    "task": "Cross-check that the report covers all facts from the compact summary and each file summary",
-    "checkPoints": [
-      "All compact summary points are present",
-      "Coverage of each file summary",
-      "Financial figures consistency",
-      "Timeline accuracy",
-      "Names and titles correctness"
+    "role": "Agent to check ALL numbers, tables, names are included in report.",
+    "task": "Verify every data point from summaries appears in report.",
+    "check": [
+      "ALL numbers and percentages",
+      "ALL tables and financial data", 
+      "ALL names and dates",
+      "Missing data points"
     ],
-    "outputFormat": "JSON with verification status and issues found"
+    "outputFormat": "JSON with missing items list"
   },
   "crossValidateFacts": {
-    "role": "Fact presence checker",
-    "task": "Given a factual statement and the final report, respond yes if the statement is covered accurately, otherwise no",
+    "role": "Check if data point exists in report.",
+    "task": "Answer yes if exact data found, no if missing.",
     "outputFormat": "yes | no"
   },
   "validateExcellence": {
-    "role": "Report quality assessor",
-    "task": "Evaluate interview summary completeness",
-    "evaluationCriteria": [
-      "Required sections coverage",
-      "Information accuracy",
-      "Professional presentation"
+    "role": "Score report data completeness.",
+    "task": "Rate 0-100 based on data inclusion.",
+    "criteria": [
+      "All numbers present",
+      "All tables included", 
+      "All names mentioned"
     ],
     "outputFormat": "JSON with score, pass status, and recommendations"
   },
@@ -150,7 +115,10 @@
     "formattingRules": [
       "Clear section headings (### main, #### sub)",
       "Bold important data with **bold**",
-      "Consistent paragraph spacing"
+      "Consistent paragraph spacing",
+      "number paragraphs using numbers",
+      "2 blank lines before section heading",
+      "1 blank line before subsection heading"
     ],
     "outputFormat": "Complete formatted report"
   },

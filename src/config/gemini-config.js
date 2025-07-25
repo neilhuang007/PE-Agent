@@ -64,8 +64,8 @@ async function retryWithBackoff(apiCall, maxRetries = MAX_RETRIES) {
 }
 
 // Create model configuration with thinking for 2.5 Pro
-export function createModelConfig(genAI, taskComplexity = 'DYNAMIC', includeThoughts = false) {
-    return genAI.getGenerativeModel({
+export function createModelConfig(genAI, taskComplexity = 'DYNAMIC', includeThoughts = false, systemInstruction = null) {
+    const config = {
         model: "gemini-2.5-pro",
         generationConfig: {
             thinkingConfig: {
@@ -73,30 +73,74 @@ export function createModelConfig(genAI, taskComplexity = 'DYNAMIC', includeThou
                 includeThoughts: includeThoughts
             }
         }
-    });
+    };
+    
+    if (systemInstruction) {
+        config.systemInstruction = systemInstruction;
+    }
+    
+    return genAI.getGenerativeModel(config);
 }
 
-// Generate content with thinking mode (simplified for 2.5 Pro)
-export async function generateWithThinking(prompt, model, thinkingPrompt = null, taskComplexity = 'DYNAMIC') {
+// Generate content with thinking mode using proper API structure
+export async function generateWithThinking(prompt, genAI, model = 'gemini-2.5-pro', systemInstruction = null, taskComplexity = 'DYNAMIC') {
     try {
-        // Check if prompt is an array (contentParts) or a string
+        const config = {
+            thinkingConfig: {
+                thinkingBudget: THINKING_BUDGETS[taskComplexity],
+            }
+        };
+
+        if (systemInstruction) {
+            config.systemInstruction = [
+                {
+                    text: systemInstruction
+                }
+            ];
+        }
+
+        // Convert prompt to proper contents format
+        let contents;
         if (Array.isArray(prompt)) {
-            // Handle contentParts array
-            const result = await retryWithBackoff(async () => {
-                return await model.generateContent(prompt);
+            // Handle contentParts array - convert to proper format
+            const userParts = [];
+            prompt.forEach(part => {
+                if (part.text) {
+                    userParts.push({ text: part.text });
+                } else if (part.fileData) {
+                    userParts.push({ fileData: part.fileData });
+                }
             });
-            return result.response.text();
+            contents = [
+                {
+                    role: 'user',
+                    parts: userParts
+                }
+            ];
         } else {
             // Handle string prompt
-            const fullPrompt = thinkingPrompt ? `${thinkingPrompt}\n\n${prompt}` : prompt;
-            
-            // Use the model's native thinking capabilities with retry
-            const result = await retryWithBackoff(async () => {
-                return await model.generateContent(fullPrompt);
-            });
-            
-            return result.response.text();
+            contents = [
+                {
+                    role: 'user',
+                    parts: [
+                        {
+                            text: prompt
+                        }
+                    ]
+                }
+            ];
         }
+
+        const result = await retryWithBackoff(async () => {
+            const response = await genAI.models.generateContent({
+                model,
+                config,
+                contents
+            });
+            return response;
+        });
+        
+        return result.response.text();
     } catch (error) {
         console.error('Error in generateWithThinking:', error);
         throw error;
