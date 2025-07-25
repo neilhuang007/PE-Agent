@@ -1,0 +1,124 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>私募股权访谈报告生成器</title>
+    <link rel="stylesheet" href="styles/styles.css">
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>私募股权访谈报告生成器</h1>
+            <p>为私募股权投资经理生成专业的访谈评估报告</p>
+        </header>
+
+        <div class="api-key-section">
+            <div class="form-group">
+                <label for="apiKey">Gemini API Key（必需）</label>
+                <input type="password" id="apiKey" placeholder="输入您的 Gemini API Key">
+                <small>您的 API Key 仅在本地使用，不会上传到任何服务器<br>
+                注意：如果遇到网络问题，请在浏览器中配置代理：http://127.0.0.1:10809</small>
+            </div>
+        </div>
+
+        <div class="main-content">
+            <div class="input-section">
+                <h2>输入信息</h2>
+                <form id="reportForm">
+                    <div class="form-group">
+                        <label for="companyName">公司名称</label>
+                        <input type="text" id="companyName" required>
+                    </div>
+
+                    <div class="form-group">
+                        <label for="intervieweeRole">受访者职位</label>
+                        <input type="text" id="intervieweeRole" required placeholder="例如：CEO、CFO、运营副总裁">
+                    </div>
+
+                    <div class="form-group">
+                        <label for="transcript">访谈记录</label>
+                        <textarea id="transcript" rows="10" required placeholder="请粘贴完整的访谈记录..."></textarea>
+                    </div>
+
+                    <div class="form-group">
+                        <label for="pdfs">上传支持文档（可选）</label>
+                        <input type="file" id="pdfs" multiple accept=".pdf,.txt">
+                        <button type="button" id="addMoreFiles" style="margin-left: 10px;">+ 添加更多文件</button>
+                        <small>上传商业计划书、研究报告、文本资料等 - 支持PDF和TXT格式，可多次添加文件</small>
+                        <div class="uploaded-files-list" id="uploadedFilesList"></div>
+                        <div class="file-upload-status" id="fileUploadStatus"></div>
+                    </div>
+
+                    <div class="form-group">
+                        <label>
+                            <input type="checkbox" id="speedMode" checked>
+                            ⚡ 快速模式
+                        </label>
+                        <small>快速模式：优化速度，保持准确性和格式，适合快速预览。关闭使用完整增强模式</small>
+                    </div>
+
+                    <div class="form-group">
+                        <label>
+                            <input type="checkbox" id="showProcessDetails" checked>
+                            📊 显示处理详情
+                        </label>
+                        <small>显示报告生成过程的详细信息：提取的信息、初始报告草稿、子代理任务和增强过程</small>
+                    </div>
+
+                    <button type="submit" id="generateBtn">生成报告</button>
+                </form>
+
+                <div class="progress-container" id="progressContainer">
+                    <div class="progress-bar">
+                        <div class="progress-fill" id="progressFill"></div>
+                    </div>
+                    <p class="progress-text" id="progressText">正在初始化...</p>
+                    <div class="chunk-details" id="chunkDetails"></div>
+                    <div class="validation-status" id="validationStatus"></div>
+                </div>
+            </div>
+
+            <div class="output-section">
+                <h2>最终报告</h2>
+                <div id="reportOutput">
+                    <p style="color: #999; text-align: center; padding: 50px;">报告将显示在这里...</p>
+                </div>
+                <button id="downloadBtn" style="display: none; margin-top: 20px;">下载报告</button>
+            </div>
+        </div>
+
+        <!-- Process Visualization Section -->
+        <div class="process-visualization" id="processVisualization" style="display: none;">
+            <div class="process-section">
+                <h2>📋 提取的信息</h2>
+                <div class="process-content" id="extractedInfo">
+                    <p style="color: #999; text-align: center; padding: 20px;">提取的信息将显示在这里...</p>
+                </div>
+            </div>
+
+            <div class="process-section">
+                <h2>📝 初始报告草稿</h2>
+                <div class="process-content" id="initialDraft">
+                    <p style="color: #999; text-align: center; padding: 20px;">初始报告草稿将显示在这里...</p>
+                </div>
+            </div>
+
+            <div class="process-section">
+                <h2>🎯 子代理增强任务</h2>
+                <div class="process-content" id="subagentTasks">
+                    <p style="color: #999; text-align: center; padding: 20px;">子代理任务将显示在这里...</p>
+                </div>
+            </div>
+
+            <div class="process-section">
+                <h2>🔄 增强替换详情</h2>
+                <div class="process-content" id="enhancementDetails">
+                    <p style="color: #999; text-align: center; padding: 20px;">增强替换详情将显示在这里...</p>
+                </div>
+            </div>
+        </div>
+
+    <script type="module" src="main.js"></script>
+</body>
+</html>
