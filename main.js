@@ -92,10 +92,10 @@ async function generateReport(e) {
         // Step 2: Document Analysis FIRST (wait for completion before chunk extraction)
         let businessPlanAnalysis = '';
         if (allUploadedFiles.length > 0) {
-            updateProgress(20, '📄 正在深度分析商业计划书和文档...');
+            updateProgress(20, `📄 正在深度分析 ${allUploadedFiles.length} 个文档（每个文档独立处理）...`);
             try {
                 businessPlanAnalysis = await comprehensiveBPAnalysis(allUploadedFiles, model);
-                updateProgress(25, '✅ 商业计划书分析完成');
+                updateProgress(25, `✅ 文档分析完成 - 提取了 ${businessPlanAnalysis.length} 字符的结构化数据`);
                 
                 // Display business plan analysis if visualization is enabled
                 if (showProcessDetails && businessPlanAnalysis) {

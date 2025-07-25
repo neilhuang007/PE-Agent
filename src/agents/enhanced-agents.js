@@ -21,46 +21,165 @@ async function loadEnhancedPrompts() {
     return enhancedPrompts;
 }
 
-// Enhanced Agent 10: Comprehensive Business Plan Analyzer
-export async function comprehensiveBPAnalysis(fileUris, model) {
-    if (!fileUris || fileUris.length === 0) {
-        return "无商业计划书可供分析";
-    }
-    
+// Enhanced Agent 10: Per-File Business Plan Analyzer
+async function analyzeIndividualFile(file, index, model) {
     try {
         const prompts = await loadEnhancedPrompts();
-        let bpPrompt = prompts.comprehensiveBPAnalysis;
-        
-        if (!bpPrompt) {
-            console.warn('BP analysis prompt not found, using fallback');
-            // Fallback to basic prompt if JSON loading fails
-            bpPrompt = {
-                role: "你是一位世界顶级的商业计划书分析专家，拥有20年分析经验，曾为数百家PE机构进行BP深度分析。",
-                taskIntro: "请对以下商业计划书进行最深度、最全面的分析：",
-                taskDetails: "分析任务：深度分析商业计划书的所有方面",
-                outputFormat: "输出格式：结构化分析报告",
-                thinkingPrompt: "分析思路：系统性商业计划书分析"
-            };
-        }
+        let filePrompt = prompts.comprehensiveBPAnalysis?.perFileAnalysis || {
+            role: "你是一位专业的文档分析专家，擅长从各种格式的文档中提取结构化信息。",
+            extractionFocus: [
+                "1. 表格数据：完整提取所有表格内容，包括行列标题和数据",
+                "2. 财务数据：收入、成本、利润、增长率等所有数字",
+                "3. 时间线数据：里程碑、时间节点、发展历程",
+                "4. 团队信息：创始人、核心团队成员及其背景",
+                "5. 产品/服务详情：功能、定价、竞争优势",
+                "6. 市场数据：市场规模、增长率、竞争格局",
+                "7. 客户信息：客户类型、案例、合作伙伴",
+                "8. 商业模式：收入来源、成本结构、盈利模式"
+            ]
+        };
         
         const contentParts = [
-            { text: bpPrompt.role }
+            { text: `${filePrompt.role}\n\n文档 ${index + 1}: ${file.displayName}\n\n请对这个文档进行深度信息提取，特别注意：\n${filePrompt.extractionFocus?.join('\n') || '提取所有重要信息'}\n\n请确保：\n- 完整提取所有表格数据（保持原始格式）\n- 保留所有具体数字和百分比\n- 提取所有人名、公司名、产品名\n- 保持时间顺序和逻辑关系\n\n开始分析：` }
         ];
         
-        contentParts.push({ text: `\n\n${bpPrompt.taskIntro}` });
-        fileUris.forEach(file => {
+        if (file.content) {
+            // For local TXT files
+            contentParts.push({ text: `\n\n文档内容：\n${file.content}` });
+        } else {
+            // For uploaded files
             contentParts.push({
                 fileData: {
                     mimeType: file.mimeType,
                     fileUri: file.uri
                 }
             });
+        }
+        
+        const result = await generateWithThinking(contentParts, model, 'Extract all structured data including tables, charts, and key information');
+        
+        return {
+            fileName: file.displayName,
+            mimeType: file.mimeType,
+            extractedContent: result,
+            extractionTime: new Date().toISOString()
+        };
+        
+    } catch (error) {
+        console.error(`Error analyzing file ${file.displayName}:`, error);
+        return {
+            fileName: file.displayName,
+            mimeType: file.mimeType,
+            extractedContent: `文件分析失败: ${error.message}`,
+            error: true
+        };
+    }
+}
+
+// Enhanced Agent 10: Comprehensive Business Plan Analyzer (Updated)
+export async function comprehensiveBPAnalysis(fileUris, model) {
+    if (!fileUris || fileUris.length === 0) {
+        return "无商业计划书可供分析";
+    }
+    
+    try {
+        console.log(`🔍 开始分析 ${fileUris.length} 个文档...`);
+        
+        // Step 1: Analyze each file individually in parallel
+        const fileAnalysisPromises = fileUris.map((file, index) => 
+            analyzeIndividualFile(file, index, model)
+        );
+        
+        const individualAnalyses = await Promise.all(fileAnalysisPromises);
+        
+        // Log extraction results
+        individualAnalyses.forEach(analysis => {
+            console.log(`✅ 文档 ${analysis.fileName} 分析完成 - 提取内容长度: ${analysis.extractedContent?.length || 0} 字符`);
         });
         
-        contentParts.push({ text: `\n\n${bpPrompt.taskDetails}\n\n${bpPrompt.outputFormat}` });
+        // Step 2: Synthesize all individual analyses into comprehensive report
+        const prompts = await loadEnhancedPrompts();
+        let synthesisPrompt = prompts.comprehensiveBPAnalysis?.synthesis || {
+            role: "你是一位世界顶级的投资分析专家，擅长整合多源信息生成深度投资分析报告。",
+            task: "基于以下各文档的独立分析结果，生成一份整合性的商业计划书深度分析报告。"
+        };
         
-        const result = await generateWithFilesAndThinking(model, contentParts, 'VERY_HIGH');
-        return result.text || result;
+        const synthesisContent = `${synthesisPrompt.role}
+
+${synthesisPrompt.task}
+
+已分析的文档及提取结果：
+${individualAnalyses.map((analysis, i) => `
+【文档 ${i + 1}】${analysis.fileName} (${analysis.mimeType})
+提取内容：
+${analysis.extractedContent}
+${'='.repeat(80)}
+`).join('\n')}
+
+请生成整合性分析报告，要求：
+1. 整合所有文档中的关键信息
+2. 突出财务数据和增长指标
+3. 分析商业模式和竞争优势
+4. 评估团队背景和执行能力
+5. 识别潜在风险和机会
+6. 提供投资建议和估值参考
+
+输出格式：
+# 商业计划书综合分析报告
+
+## 1. 公司概况
+[整合所有文档中的公司基本信息]
+
+## 2. 财务分析
+[所有财务数据、表格、增长率等]
+
+## 3. 商业模式
+[收入来源、成本结构、盈利能力]
+
+## 4. 市场分析
+[市场规模、竞争格局、增长潜力]
+
+## 5. 团队评估
+[创始团队、核心成员、背景实力]
+
+## 6. 产品/服务分析
+[产品特点、技术优势、客户价值]
+
+## 7. 风险与机会
+[主要风险、增长机会、护城河]
+
+## 8. 投资建议
+[估值分析、投资亮点、关注点]`;
+        
+        const synthesisResult = await generateWithThinking(synthesisContent, model, 'Synthesize all document analyses into comprehensive investment report');
+        
+        // Step 3: Return both individual analyses and synthesis for transparency
+        const fullReport = `${'='.repeat(80)}
+📊 商业计划书分析报告
+${'='.repeat(80)}
+
+📁 分析文档数量: ${fileUris.length}
+⏰ 分析时间: ${new Date().toLocaleString('zh-CN')}
+
+${'='.repeat(80)}
+📋 各文档独立分析结果
+${'='.repeat(80)}
+
+${individualAnalyses.map((analysis, i) => `
+### 文档 ${i + 1}: ${analysis.fileName}
+类型: ${analysis.mimeType}
+分析时间: ${new Date(analysis.extractionTime).toLocaleTimeString('zh-CN')}
+
+${analysis.extractedContent}
+`).join('\n' + '-'.repeat(60) + '\n')}
+
+${'='.repeat(80)}
+📈 综合分析报告
+${'='.repeat(80)}
+
+${synthesisResult}`;
+        
+        return fullReport;
         
     } catch (error) {
         console.error('BP analysis error:', error);

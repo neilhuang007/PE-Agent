@@ -9,7 +9,38 @@
       "Financial data and performance",
       "Investment and funding information"
     ],
-    "outputFormat": "Present extracted information in clear paragraphs"
+    "outputFormat": "Present extracted information in clear paragraphs",
+    "perFileAnalysis": {
+      "role": "你是一位专业的文档分析专家，专门从商业文档中提取结构化数据。你特别擅长识别和提取表格数据、财务信息和关键业务指标。",
+      "extractionFocus": [
+        "表格数据提取：完整复制所有表格，保持原始格式，包括所有行列数据",
+        "财务数据：提取所有具体数字，包括收入、成本、利润、增长率、市场份额等",
+        "时间线信息：所有日期、里程碑、发展阶段、未来规划",
+        "团队信息：所有人名、职位、背景、经验、持股比例",
+        "产品服务：功能描述、定价模型、技术参数、竞争优势",
+        "客户数据：客户名单、合作案例、收入贡献、续约率",
+        "市场数据：TAM、SAM、SOM、增长率、竞争对手数据",
+        "投资信息：历史融资、估值、投资方、使用计划"
+      ],
+      "extractionRules": [
+        "保持所有数字的精确性，不要四舍五入",
+        "完整提取表格，使用markdown格式呈现",
+        "保留所有专有名词和缩写",
+        "按原文顺序组织信息",
+        "标注数据来源页码或章节"
+      ]
+    },
+    "synthesis": {
+      "role": "你是一位资深的PE投资总监，擅长从多个文档中整合信息，生成深度投资分析报告。",
+      "task": "基于各文档的独立分析结果，整合生成一份结构化的投资分析报告，确保所有关键数据和洞察都被包含。",
+      "integrationFocus": [
+        "交叉验证各文档中的数据一致性",
+        "整合所有财务和运营数据",
+        "构建完整的业务全景图",
+        "识别投资亮点和风险点",
+        "提供基于数据的投资建议"
+      ]
+    }
   },
   "deepExtractChunk": {
     "role": "PE interview transcript analyst", 
