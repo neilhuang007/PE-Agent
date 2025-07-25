@@ -4,7 +4,7 @@
 
 import { generateWithThinking, generateWithFilesAndThinking } from '../config/gemini-config.js';
 import { compactChineseBullets } from '../utils/utils.js';
-import { initGeminiClient, generateWithRetry, convertContentParts } from '../utils/simple-gemini-wrapper.js';
+import { initGeminiClient, generateWithRetry, convertContentParts } from '../utils/gemini-wrapper.js';
 
 // Load prompts from centralized JSON files
 let enhancedPrompts = null;

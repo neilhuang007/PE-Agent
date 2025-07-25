@@ -1,4 +1,5 @@
 // Master-SubAgent System - Quote-based targeted enhancement
+import { generateWithRetry, convertContentParts } from './src/utils/gemini-wrapper.js';
 
 // Retry configuration for handling API errors
 const MAX_RETRIES = 3;
@@ -98,10 +99,8 @@ ${report}
 - 每个引用片段长度在50-300字之间为宜`;
 
     try {
-        const result = await retryWithBackoff(async () => {
-            return await model.generateContent(prompt);
-        });
-        const text = result.response.text();
+        const parts = convertContentParts([{ text: prompt }]);
+        const text = await generateWithRetry(parts, '增强任务识别专家', -1);
         const jsonMatch = text.match(/\{[\s\S]*\}/);
         if (jsonMatch) {
             return JSON.parse(jsonMatch[0]);
@@ -175,13 +174,12 @@ ${transcript}` }
 增强后的内容：` });
 
     try {
-        const result = await retryWithBackoff(async () => {
-            return await model.generateContent(contentParts);
-        });
+        const gParts = convertContentParts(contentParts);
+        const resultText = await generateWithRetry(gParts, '增强执行专家', -1);
         return {
             task_id: task.task_id,
             original_quote: task.original_quote,
-            enhanced_content: result.response.text().trim(),
+            enhanced_content: resultText.trim(),
             research_task: task.research_task,
             priority: task.priority
         };

@@ -1,5 +1,5 @@
 import { GoogleGenerativeAI } from 'https://esm.run/@google/generative-ai';
-import { initGeminiClient } from './src/utils/simple-gemini-wrapper.js';
+import { initGeminiClient } from './src/utils/gemini-wrapper.js';
 import { 
     deepExtractChunk, 
     architectInformation, 

@@ -1,5 +1,6 @@
 // Final formatting agent to ensure enhanced reports are properly formatted and displayed
 import { generateWithThinking } from '../config/gemini-config.js';
+import { generateWithRetry, convertContentParts } from '../utils/gemini-wrapper.js';
 
 /**
  * Final formatter agent that ensures the enhanced report is professionally formatted
@@ -124,8 +125,8 @@ ${report}
 请输出格式化后的报告：`;
 
     try {
-        const formattedReport = await model.generateContent(prompt);
-        const result = formattedReport.response.text();
+        const parts = convertContentParts([{ text: prompt }]);
+        const result = await generateWithRetry(parts, '专业报告格式化专家', -1);
         
         if (!result || typeof result !== 'string') {
             console.warn('⚠️ 快速格式化失败，返回原报告');
