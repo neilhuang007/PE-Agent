@@ -3,6 +3,7 @@
 // world-class private equity interview reports using Gemini Pro's thinking capabilities
 
 import { generateWithThinking, generateWithFilesAndThinking } from '../config/gemini-config.js';
+import { compactChineseBullets } from '../utils/utils.js';
 
 // Load prompts from centralized JSON files
 let enhancedPrompts = null;
@@ -79,7 +80,7 @@ async function analyzeIndividualFile(file, index, model) {
 // Enhanced Agent 10: Comprehensive Business Plan Analyzer (Updated)
 export async function comprehensiveBPAnalysis(fileUris, model) {
     if (!fileUris || fileUris.length === 0) {
-        return "无商业计划书可供分析";
+        return { fullReport: "无商业计划书可供分析", compactSummary: '', fileSummaries: [] };
     }
     
     try {
@@ -152,7 +153,7 @@ ${'='.repeat(80)}
 [估值分析、投资亮点、关注点]`;
         
         const synthesisResult = await generateWithThinking(synthesisContent, model, 'Synthesize all document analyses into comprehensive investment report');
-        
+
         // Step 3: Return both individual analyses and synthesis for transparency
         const fullReport = `${'='.repeat(80)}
 📊 商业计划书分析报告
@@ -178,8 +179,10 @@ ${'='.repeat(80)}
 ${'='.repeat(80)}
 
 ${synthesisResult}`;
-        
-        return fullReport;
+        const fileSummaries = individualAnalyses.map(a => compactChineseBullets(a.extractedContent));
+        const compactSummary = compactChineseBullets(fileSummaries.join('\n'));
+
+        return { fullReport, compactSummary, fileSummaries };
         
     } catch (error) {
         console.error('BP analysis error:', error);
@@ -317,7 +320,7 @@ ${composePrompt.writingStandards.map((std, i) => `${i + 1}. ${std}`).join('\n')}
 }
 
 // Enhanced Agent 4: Citation Verifier
-export async function verifyCitations(report, transcript, businessPlanAnalysis, fileUris, model) {
+export async function verifyCitations(report, transcript, compactSummary, fileSummaries, fileUris, model) {
     try {
         const prompts = await loadEnhancedPrompts();
         const verifyPrompt = prompts.verifyCitations;
@@ -333,14 +336,17 @@ export async function verifyCitations(report, transcript, businessPlanAnalysis, 
 
 ${verifyPrompt.checkPoints.map((task, i) => `${i + 1}. ${task}`).join('\n')}
 
+压缩总结:
+${compactSummary}
+
+文件摘要:
+${fileSummaries.map((fs,i)=>`文件${i+1}: ${fs}`).join('\n')}
+
 报告内容:
 ${report}
 
 原始访谈记录:
-${transcript}
-
-商业计划书分析:
-${businessPlanAnalysis || '无商业计划书数据'}` }
+${transcript}` }
         ];
         
         // Add uploaded files as verification sources
@@ -375,6 +381,41 @@ ${businessPlanAnalysis || '无商业计划书数据'}` }
     } catch (error) {
         console.error('Error in verifyCitations:', error);
         return { verified: false, error: error.message };
+    }
+}
+
+// Enhanced Agent 4b: Cross-validate each fact from summaries
+export async function crossValidateFacts(report, compactSummary, fileSummaries, model) {
+    try {
+        const prompts = await loadEnhancedPrompts();
+        const factPrompt = prompts.crossValidateFacts || {
+            role: 'Fact presence checker',
+            task: 'Answer yes if the fact is mentioned in the report, otherwise no',
+            outputFormat: 'yes | no'
+        };
+
+        // Gather unique facts from compact summary and file summaries
+        const extractFacts = text =>
+            text ? text.split('\n').map(l => l.replace(/^\s*[•*-]?\s*/, '').trim()).filter(Boolean) : [];
+
+        let facts = extractFacts(compactSummary);
+        if (Array.isArray(fileSummaries)) {
+            fileSummaries.forEach(fs => {
+                facts = facts.concat(extractFacts(fs));
+            });
+        }
+        const uniqueFacts = Array.from(new Set(facts));
+
+        const results = [];
+        for (const fact of uniqueFacts) {
+            const prompt = `${factPrompt.role}\n${factPrompt.task}\n\n事实: ${fact}\n\n报告内容:\n${report}\n\n${factPrompt.outputFormat}`;
+            const res = await generateWithThinking(prompt, model, 'Cross validate single fact');
+            results.push({ fact, present: /^yes/i.test(res.trim()), raw: res.trim() });
+        }
+        return results;
+    } catch (error) {
+        console.error('Error in crossValidateFacts:', error);
+        return [];
     }
 }
 
