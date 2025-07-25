@@ -3,8 +3,9 @@ import {
     deepExtractChunk, 
     architectInformation, 
     masterComposeReport, 
-    verifyCitations, 
-    validateExcellence, 
+    verifyCitations,
+    crossValidateFacts,
+    validateExcellence,
     intelligentEnrichment, 
     integrateEnhancements, 
     excellenceFormatter, 
@@ -24,7 +25,7 @@ import { orchestrateMasterSubAgentSystem } from './master-subagent-system.js';
 import { createModelConfig } from './src/config/gemini-config.js';
 import { readPDFs } from './src/utils/pdf-handler.js';
 import { uploadFileToGemini, deleteFileFromGemini } from './src/utils/gemini-files.js';
-import { chunkTranscript, updateProgress, getApiKey, saveApiKey, downloadReport } from './src/utils/utils.js';
+import { chunkTranscript, updateProgress, getApiKey, saveApiKey, downloadReport, compactChineseBullets } from './src/utils/utils.js';
 import { finalReportFormatter, quickFinalFormatter, formatForDisplay } from './src/agents/final-formatter.js';
 
 let currentReport = '';
@@ -91,11 +92,16 @@ async function generateReport(e) {
         
         // Step 2: Document Analysis FIRST (wait for completion before chunk extraction)
         let businessPlanAnalysis = '';
+        let compactBP = '';
+        let fileSummaries = [];
         if (allUploadedFiles.length > 0) {
             updateProgress(20, `📄 正在深度分析 ${allUploadedFiles.length} 个文档（每个文档独立处理）...`);
             try {
-                businessPlanAnalysis = await comprehensiveBPAnalysis(allUploadedFiles, model);
-                updateProgress(25, `✅ 文档分析完成 - 提取了 ${businessPlanAnalysis.length} 字符的结构化数据`);
+                const bpResult = await comprehensiveBPAnalysis(allUploadedFiles, model);
+                businessPlanAnalysis = bpResult.fullReport;
+                compactBP = bpResult.compactSummary;
+                fileSummaries = bpResult.fileSummaries;
+                updateProgress(25, `✅ 文档分析完成 - 提取了 ${compactBP.length} 字符的结构化数据`);
                 
                 // Display business plan analysis if visualization is enabled
                 if (showProcessDetails && businessPlanAnalysis) {
@@ -122,7 +128,7 @@ async function generateReport(e) {
             // Use faster extraction method with BP context
             const fastExtractionPromises = chunks.map(async (chunk, i) => {
                 try {
-                    return await fastExtractChunk(chunk, i, businessPlanAnalysis, model);
+                    return await fastExtractChunk(chunk, i, compactBP, model);
                 } catch (error) {
                     console.error(`Error in fast processing chunk ${i + 1}:`, error);
                     return `片段 ${i + 1} 快速处理失败: ${error.message}`;
@@ -140,7 +146,7 @@ async function generateReport(e) {
             // Fast organization and report generation
             updateProgress(60, '⚡ 快速信息整理...');
             
-            organizedInfo = await fastOrganizeInformation(extractedChunks, businessPlanAnalysis, model);
+            organizedInfo = await fastOrganizeInformation(extractedChunks, compactBP, model);
             updateProgress(70, '⚡ 生成初始报告...');
             currentReport = await fastComposeReport(organizedInfo, companyName, model);
             
@@ -152,7 +158,7 @@ async function generateReport(e) {
             // Fast quality and formatting pipeline (no subagent enhancement for speed)
             updateProgress(85, '⚡ 快速质量检查和格式化...');
             const [qualityResult, formattedReport] = await Promise.all([
-                fastQualityCheck(currentReport, transcript, businessPlanAnalysis, model),
+                fastQualityCheck(currentReport, transcript, compactBP, model),
                 detectAndRemoveBias(currentReport, model).then(debiased => 
                     fastFormatReport(debiased, model)
                 )
@@ -178,7 +184,7 @@ async function generateReport(e) {
             
             const extractionPromises = chunks.map(async (chunk, i) => {
                 try {
-                    return await deepExtractChunk(chunk, i, transcript, businessPlanAnalysis, allUploadedFiles, model);
+                    return await deepExtractChunk(chunk, i, transcript, compactBP, allUploadedFiles, model);
                 } catch (error) {
                     console.error(`Error processing chunk ${i + 1}:`, error);
                     return `片段 ${i + 1} 处理失败: ${error.message}`;
@@ -195,7 +201,7 @@ async function generateReport(e) {
             
             // Generate initial enhanced report
             updateProgress(58, '📊 生成增强模式初始报告...');
-            const enhancedInfoSources = [businessPlanAnalysis].filter(Boolean).join('\n\n');
+            const enhancedInfoSources = [compactBP].filter(Boolean).join('\n\n');
             
             organizedInfo = await architectInformation(extractedChunks, enhancedInfoSources, allUploadedFiles, model);
             currentReport = await masterComposeReport(organizedInfo, companyName, allUploadedFiles, model);
@@ -233,13 +239,20 @@ async function generateReport(e) {
             updateProgress(80, '🔍 深度验证和质量控制...');
             try {
                 // Citation Verification with all data sources
-                const citationVerification = await verifyCitations(currentReport, transcript, businessPlanAnalysis, allUploadedFiles, model);
+                const citationVerification = await verifyCitations(currentReport, transcript, compactBP, fileSummaries, allUploadedFiles, model);
                 if (!citationVerification.verified && citationVerification.issues?.length > 0) {
                     console.warn('⚠️ 引用验证发现问题:', citationVerification.issues);
                 }
-                
+
+                // Cross validate every fact from summaries
+                const factValidation = await crossValidateFacts(currentReport, compactBP, fileSummaries, model);
+                const missingFacts = factValidation.filter(r => !r.present);
+                if (missingFacts.length > 0) {
+                    console.warn('⚠️ 报告遗漏信息:', missingFacts.map(m => m.fact));
+                }
+
                 // Excellence Validation with comprehensive data
-                const excellenceValidation = await validateExcellence(currentReport, transcript, businessPlanAnalysis, allUploadedFiles, model);
+                const excellenceValidation = await validateExcellence(currentReport, transcript, compactBP, allUploadedFiles, model);
                 if (excellenceValidation.score < 80) {
                     console.warn('⚠️ 质量评分较低:', excellenceValidation.score);
                 }
@@ -260,7 +273,7 @@ async function generateReport(e) {
                     console.warn('⚠️ 偏向性检测失败，保持原报告');
                 }
                 
-                const formattedReport = await excellenceFormatter(currentReport, transcript, businessPlanAnalysis, allUploadedFiles, model);
+                const formattedReport = await excellenceFormatter(currentReport, transcript, compactBP, allUploadedFiles, model);
                 if (formattedReport && typeof formattedReport === 'string') {
                     currentReport = formattedReport;
                 } else {
@@ -286,7 +299,7 @@ async function generateReport(e) {
             // Final Quality Inspection with all sources
             updateProgress(97, '🔍 最终质量检查...');
             try {
-                const finalQualityResult = await finalQualityInspection(currentReport, transcript, businessPlanAnalysis, allUploadedFiles, model);
+                const finalQualityResult = await finalQualityInspection(currentReport, transcript, compactBP, allUploadedFiles, model);
                 if (!finalQualityResult.pass) {
                     console.warn('⚠️ 最终质量检查未通过:', finalQualityResult.quality);
                 }

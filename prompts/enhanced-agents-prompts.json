@@ -9,7 +9,7 @@
       "Financial data and performance",
       "Investment and funding information"
     ],
-    "outputFormat": "Present extracted information in clear paragraphs",
+    "outputFormat": "Use Chinese bullet points only, limit to 10000 characters",
     "perFileAnalysis": {
       "role": "你是一位专业的文档分析专家，专门从商业文档中提取结构化数据。你特别擅长识别和提取表格数据、财务信息和关键业务指标。",
       "extractionFocus": [
@@ -28,7 +28,8 @@
         "保留所有专有名词和缩写",
         "按原文顺序组织信息",
         "标注数据来源页码或章节"
-      ]
+      ],
+      "outputFormat": "仅以中文要点列出所有信息，总长度不超过10000字符"
     },
     "synthesis": {
       "role": "你是一位资深的PE投资总监，擅长从多个文档中整合信息，生成深度投资分析报告。",
@@ -52,8 +53,8 @@
       "Market: industry, size, position",
       "Timeline: dates, milestones"
     ],
-    "outputFormat": "Present information in detailed paragraphs"
-  },
+      "outputFormat": "仅用中文项目符号列出事实，不做任何分析或建议"
+    },
   "architectInformation": {
     "role": "Information organizer for PE reports",
     "task": "Organize extracted information into required report sections",
@@ -88,22 +89,30 @@
         "subsections": ["融资历史"]
       }
     },
-    "writingStandards": [
-      "Use factual information from interview only",
-      "通过专业、精确的方式，提供具有深度洞察的行业和企业报告",
+      "writingStandards": [
+      "Use factual information from interview and research files only",
+      "不得加入个人分析或建议",
+      "通过专业、精确的方式呈现事实",
       "Include specific numbers and data points",
       "Keep sections concise and focused"
     ]
   },
   "verifyCitations": {
     "role": "Data verification specialist",
-    "task": "Verify accuracy of key data in interview summary",
+    "task": "Cross-check that the report covers all facts from the compact summary and each file summary",
     "checkPoints": [
+      "All compact summary points are present",
+      "Coverage of each file summary",
       "Financial figures consistency",
-      "Timeline accuracy", 
+      "Timeline accuracy",
       "Names and titles correctness"
     ],
     "outputFormat": "JSON with verification status and issues found"
+  },
+  "crossValidateFacts": {
+    "role": "Fact presence checker",
+    "task": "Given a factual statement and the final report, respond yes if the statement is covered accurately, otherwise no",
+    "outputFormat": "yes | no"
   },
   "validateExcellence": {
     "role": "Report quality assessor",
