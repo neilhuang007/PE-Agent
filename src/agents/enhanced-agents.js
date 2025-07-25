@@ -29,19 +29,18 @@ export async function comprehensiveBPAnalysis(fileUris, model) {
     
     try {
         const prompts = await loadEnhancedPrompts();
-        const bpPrompt = prompts.comprehensiveBPAnalysis;
+        let bpPrompt = prompts.comprehensiveBPAnalysis;
         
         if (!bpPrompt) {
             console.warn('BP analysis prompt not found, using fallback');
             // Fallback to basic prompt if JSON loading fails
-            const fallbackPrompt = {
+            bpPrompt = {
                 role: "你是一位世界顶级的商业计划书分析专家，拥有20年分析经验，曾为数百家PE机构进行BP深度分析。",
                 taskIntro: "请对以下商业计划书进行最深度、最全面的分析：",
                 taskDetails: "分析任务：深度分析商业计划书的所有方面",
                 outputFormat: "输出格式：结构化分析报告",
                 thinkingPrompt: "分析思路：系统性商业计划书分析"
             };
-            bpPrompt = fallbackPrompt;
         }
         
         const contentParts = [
@@ -88,11 +87,11 @@ ${chunk}
 完整访谈上下文（用于理解背景）:
 ${transcript.substring(0, 5000)}...
 
-${extractPrompt.requirements.map((req, i) => `${i + 1}. ${req}`).join('\n')}
+${extractPrompt.extractionFocus.map((req, i) => `${i + 1}. ${req}`).join('\n')}
 
 ${extractPrompt.outputFormat}`;
         
-        const result = await generateWithThinking(prompt, model, extractPrompt.thinkingPrompt);
+        const result = await generateWithThinking(prompt, model, 'Extract key information from this transcript segment');
         return result;
         
     } catch (error) {
@@ -116,17 +115,17 @@ export async function architectInformation(extractedChunks, enhancedInfoSources,
         
         const prompt = `${archPrompt.role}
 
-${archPrompt.mainTask}
+${archPrompt.task}
 
-${archPrompt.requirements.map((req, i) => `${i + 1}. ${req}`).join('\n')}
+组织结构要求:
+${Object.entries(archPrompt.organizationStructure).map(([key, desc], i) => `${i + 1}. ${key}: ${desc}`).join('\n')}
 
 信息源:
 ${allInfo.substring(0, 15000)}
 
-请按照以下结构输出分析结果：
-${JSON.stringify(archPrompt.outputStructure, null, 2)}`;
+${archPrompt.outputFormat}`;
         
-        const result = await generateWithThinking(prompt, model, archPrompt.thinkingPrompt);
+        const result = await generateWithThinking(prompt, model, 'Organize extracted information into structured sections');
         
         try {
             return JSON.parse(result);
@@ -153,7 +152,7 @@ export async function masterComposeReport(organizedInfo, companyName, fileUris, 
         
         const prompt = `${composePrompt.role}
 
-${composePrompt.taskDescription}
+${composePrompt.task}
 
 公司名称: ${companyName}
 
@@ -164,9 +163,9 @@ ${JSON.stringify(organizedInfo, null, 2)}
 ${JSON.stringify(composePrompt.reportStructure, null, 2)}
 
 写作标准：
-${composePrompt.writingStandards.join('\n- ')}`;
+${composePrompt.writingStandards.map((std, i) => `${i + 1}. ${std}`).join('\n')}`;
         
-        const result = await generateWithThinking(prompt, model, composePrompt.thinkingPrompt);
+        const result = await generateWithThinking(prompt, model, 'Generate comprehensive PE interview report');
         return result;
         
     } catch (error) {
@@ -188,15 +187,15 @@ export async function verifyCitations(report, model) {
         
         const prompt = `${verifyPrompt.role}
 
-${verifyPrompt.verificationTasks.map((task, i) => `${i + 1}. ${task}`).join('\n')}
+${verifyPrompt.checkPoints.map((task, i) => `${i + 1}. ${task}`).join('\n')}
 
 报告内容:
 ${report.substring(0, 10000)}
 
 请按照以下格式输出验证结果：
-${JSON.stringify(verifyPrompt.outputRequirements, null, 2)}`;
+${verifyPrompt.outputFormat}`;
         
-        const result = await generateWithThinking(prompt, model, verifyPrompt.thinkingPrompt);
+        const result = await generateWithThinking(prompt, model, 'Verify data accuracy in the report');
         
         try {
             return JSON.parse(result);
@@ -224,10 +223,10 @@ export async function validateExcellence(report, model) {
         const prompt = `${validatePrompt.role}
 
 评估标准：
-${JSON.stringify(validatePrompt.evaluationCriteria, null, 2)}
+${validatePrompt.evaluationCriteria.map((criteria, i) => `${i + 1}. ${criteria}`).join('\n')}
 
 评分系统：
-${JSON.stringify(validatePrompt.scoringSystem, null, 2)}
+${validatePrompt.outputFormat}
 
 报告内容:
 ${report.substring(0, 10000)}
@@ -235,7 +234,7 @@ ${report.substring(0, 10000)}
 请按照以下格式输出评估结果：
 ${JSON.stringify(validatePrompt.outputFormat, null, 2)}`;
         
-        const result = await generateWithThinking(prompt, model, validatePrompt.thinkingPrompt);
+        const result = await generateWithThinking(prompt, model, 'Evaluate report quality and completeness');
         
         try {
             return JSON.parse(result);
@@ -263,7 +262,7 @@ export async function intelligentEnrichment(report, originalSources, model) {
         const prompt = `${enrichPrompt.role}
 
 增强策略：
-${enrichPrompt.enrichmentStrategy.map((strategy, i) => `${i + 1}. ${strategy}`).join('\n')}
+${enrichPrompt.searchStrategy.map((strategy, i) => `${i + 1}. ${strategy}`).join('\n')}
 
 当前报告:
 ${report.substring(0, 8000)}
@@ -274,7 +273,7 @@ ${originalSources.substring(0, 5000)}
 请按照以下格式输出增强内容：
 ${JSON.stringify(enrichPrompt.outputFormat, null, 2)}`;
         
-        const result = await generateWithThinking(prompt, model, enrichPrompt.thinkingPrompt);
+        const result = await generateWithThinking(prompt, model, 'Find additional relevant information to enrich the report');
         
         try {
             return JSON.parse(result);
@@ -302,7 +301,7 @@ export async function integrateEnhancements(report, enrichments, model) {
         const prompt = `${integratePrompt.role}
 
 整合原则：
-${integratePrompt.integrationPrinciples.map((principle, i) => `${i + 1}. ${principle}`).join('\n')}
+${integratePrompt.integrationRules.map((principle, i) => `${i + 1}. ${principle}`).join('\n')}
 
 当前报告:
 ${report}
@@ -312,7 +311,7 @@ ${JSON.stringify(enrichments, null, 2)}
 
 请输出整合后的完整报告：`;
         
-        const result = await generateWithThinking(prompt, model, integratePrompt.thinkingPrompt);
+        const result = await generateWithThinking(prompt, model, 'Integrate enhancements into the main report');
         return result;
         
     } catch (error) {
@@ -335,14 +334,14 @@ export async function excellenceFormatter(report, model) {
         const prompt = `${formatPrompt.role}
 
 格式化标准：
-${JSON.stringify(formatPrompt.formattingStandards, null, 2)}
+${formatPrompt.formattingRules.map((rule, i) => `${i + 1}. ${rule}`).join('\n')}
 
 当前报告:
 ${report}
 
 请输出专业格式化后的报告：`;
         
-        const result = await generateWithThinking(prompt, model, formatPrompt.thinkingPrompt);
+        const result = await generateWithThinking(prompt, model, 'Format the report to professional standards');
         return result;
         
     } catch (error) {
@@ -365,18 +364,18 @@ export async function finalQualityInspection(report, model) {
         const prompt = `${inspectPrompt.role}
 
 检查清单：
-${JSON.stringify(inspectPrompt.inspectionChecklist, null, 2)}
+${inspectPrompt.inspectionChecklist.map((item, i) => `${i + 1}. ${item}`).join('\n')}
 
-质量指标：
-${JSON.stringify(inspectPrompt.qualityMetrics, null, 2)}
+输出格式：
+${inspectPrompt.outputFormat}
 
 报告内容:
 ${report.substring(0, 10000)}
 
 请按照以下格式输出检查结果：
-${JSON.stringify(inspectPrompt.finalActions, null, 2)}`;
+${inspectPrompt.outputFormat}`;
         
-        const result = await generateWithThinking(prompt, model, inspectPrompt.thinkingPrompt);
+        const result = await generateWithThinking(prompt, model, 'Perform final quality inspection of the report');
         
         try {
             return JSON.parse(result);

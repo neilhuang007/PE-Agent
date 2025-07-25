@@ -1,54 +1,70 @@
 {
   "fastExtractChunk": {
-    "role": "作为私募股权分析师，从以下访谈片段中提取客观事实和具体数据，避免主观分析",
-    "requirements": [
-      "仅提取明确陈述的事实",
-      "保留所有数字和百分比",
-      "记录人名、公司名、时间",
-      "不进行推断或解释",
-      "保持原始表述"
+    "role": "Quick information extractor for PE interviews",
+    "task": "Extract key facts from interview transcript segment",
+    "extractionFocus": [
+      "Numbers: revenue, users, growth rates, market share",
+      "Business: products, services, business model",
+      "Finance: revenue, costs, profits, funding needs", 
+      "Team: size, key personnel, backgrounds",
+      "Timeline: founding date, milestones"
     ],
-    "outputFormat": "简洁列出提取的信息点，每行一个要点"
+    "outputFormat": "Output format:\nData: [specific numbers]\nBusiness: [core business info]\nFinance: [financial data]\nTeam: [team info]\nOther: [other important facts]"
   },
   "fastOrganizeInformation": {
-    "role": "整理以下提取的信息，构建结构化报告框架",
-    "sections": [
-      "公司基本信息",
-      "业务模式",
-      "财务数据",
-      "市场和竞争",
-      "团队",
-      "其他要点"
-    ],
-    "requirements": "将信息快速归类，不添加分析"
+    "role": "Information organizer", 
+    "task": "Organize extracted information into structured JSON format",
+    "organizationStructure": {
+      "公司简介": ["基本信息", "核心团队"],
+      "行业情况": ["市场信息", "行业背景"],
+      "主营业务": ["核心业务", "产品服务"],
+      "财务情况": ["收入数据", "成本利润"],
+      "融资情况": ["融资历史", "资金需求"]
+    },
+    "outputFormat": "Return strict JSON format with clear structure"
   },
   "fastComposeReport": {
-    "role": "基于以下信息快速生成专业的私募股权访谈纪要",
-    "style": "专业、客观、简洁",
-    "structure": {
-      "summary": "核心要点（3-5条）",
-      "sections": "按逻辑组织的主要章节",
-      "conclusion": "关键发现和后续事项"
-    }
+    "role": "PE interview report writer",
+    "task": "Generate professional interview summary report",
+    "requirements": [
+      "Use professional investment language",
+      "Bold important data with **bold**",
+      "Clear section structure",
+      "Use only factual information from interview",
+      "Focus on interview summary, not analysis"
+    ],
+    "reportStructure": [
+      "### 【公司简介】",
+      "#### 公司概述", 
+      "#### 核心团队",
+      "### 【行业情况】",
+      "### 【主营业务】",
+      "### 【财务情况】", 
+      "### 【融资情况】",
+      "#### 融资历史"
+    ],
+    "outputFormat": "Output complete formatted report directly"
   },
   "fastQualityCheck": {
-    "role": "快速评估以下PE访谈纪要的质量",
-    "checkPoints": [
-      "信息完整性",
-      "数据准确性",
-      "结构清晰度",
-      "专业性"
+    "role": "Report quality checker",
+    "task": "Quick quality assessment of interview report",
+    "evaluationCriteria": [
+      "Completeness: covers all required sections",
+      "Accuracy: numbers and facts are correct",
+      "Structure: proper section organization",
+      "Language: professional investment terminology"
     ],
-    "output": "简要列出优点和需改进点"
+    "outputFormat": "JSON: {\"score\": [number], \"pass\": [true/false], \"issues\": [list], \"summary\": \"[assessment]\"}"
   },
   "fastFormatReport": {
-    "role": "对以下报告进行快速专业格式化",
-    "formatting": [
-      "添加清晰的标题层级",
-      "统一数据呈现格式",
-      "确保段落结构合理",
-      "添加必要的强调标记"
+    "role": "Report formatter",
+    "task": "Quick formatting for professional presentation",
+    "formattingRequirements": [
+      "Consistent heading format (### main, #### sub)",
+      "Bold important data with **bold**",
+      "Proper paragraph spacing",
+      "Professional appearance"
     ],
-    "principle": "保持简洁专业，提高可读性"
+    "outputFormat": "Return complete formatted report"
   }
 }

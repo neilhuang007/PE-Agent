@@ -1,29 +1,47 @@
 // Fast agents optimized for speed while maintaining quality
 // These agents use more concise prompts and focus on essential information extraction
 
+// Load prompts from centralized JSON files
+let fastPrompts = null;
+
+async function loadFastPrompts() {
+    if (!fastPrompts) {
+        try {
+            const response = await fetch('./prompts/fast-agents-prompts.json');
+            fastPrompts = await response.json();
+        } catch (error) {
+            console.error('Failed to load fast prompts:', error);
+            // Fallback to empty object if loading fails
+            fastPrompts = {};
+        }
+    }
+    return fastPrompts;
+}
+
 // Fast Agent 1: Quick Information Extraction - Optimized for Speed and Accuracy
 export async function fastExtractChunk(chunk, index, model) {
     console.log(`FastExtractChunk ${index + 1} input:`, chunk.substring(0, 100) + '...'); // Debug log
     
-    const prompt = `快速提取访谈片段中的关键信息。只要客观事实，确保准确性：
+    try {
+        const prompts = await loadFastPrompts();
+        const extractPrompt = prompts.fastExtractChunk;
+        
+        if (!extractPrompt) {
+            console.warn('Fast extract prompt not found, using fallback');
+            return `片段 ${index + 1}: ${chunk.substring(0, 500)}...`;
+        }
+        
+        const prompt = `${extractPrompt.role}
+
+${extractPrompt.task}
 
 片段 ${index + 1}: ${chunk}
 
 重点提取：
-• 具体数字：收入、用户量、增长率、市场份额
-• 业务核心：产品服务、商业模式、客户情况
-• 财务数据：营收、成本、利润、资金需求
-• 团队信息：规模、关键人员、背景
-• 时间节点：成立时间、重要里程碑
+${extractPrompt.extractionFocus.map(focus => `• ${focus}`).join('\n')}
 
-输出简洁要点：
-数据: 
-业务: 
-财务: 
-团队: 
-其他: `;
+${extractPrompt.outputFormat}`;
 
-    try {
         const result = await model.generateContent(prompt);
         const extractedText = result.response.text();
         console.log(`FastExtractChunk ${index + 1} result:`, extractedText.substring(0, 150) + '...'); // Debug log
@@ -38,20 +56,32 @@ export async function fastExtractChunk(chunk, index, model) {
 export async function fastOrganizeInformation(extractedChunks, businessPlan, model) {
     const allInfo = extractedChunks.join('\n') + (businessPlan ? `\n${businessPlan.substring(0, 800)}` : '');
     
-    const prompt = `快速整理为结构化报告，输出JSON：
+    try {
+        const prompts = await loadFastPrompts();
+        const organizePrompt = prompts.fastOrganizeInformation;
+        
+        if (!organizePrompt) {
+            console.warn('Fast organize prompt not found, using fallback');
+            return {
+                "公司概况": ["信息提取失败"],
+                "业务模式": ["信息提取失败"],
+                "财务状况": ["信息提取失败"],
+                "市场情况": ["信息提取失败"],
+                "发展计划": ["信息提取失败"]
+            };
+        }
+        
+        const prompt = `${organizePrompt.role}
+
+${organizePrompt.task}
 
 信息: ${allInfo}
 
 JSON格式：
-{
-  "公司概况": ["基本信息","团队情况"],
-  "业务模式": ["核心业务","产品服务"],
-  "财务状况": ["收入数据","成本利润"],
-  "市场情况": ["市场地位","竞争情况"],
-  "发展计划": ["未来规划","资金需求"]
-}`;
+${JSON.stringify(organizePrompt.organizationStructure, null, 2)}
 
-    try {
+${organizePrompt.outputFormat}`;
+
         const result = await model.generateContent(prompt);
         const text = result.response.text();
         console.log('FastOrganize raw response:', text); // Debug log
@@ -100,30 +130,32 @@ export async function fastComposeReport(organizedInfo, companyName, model) {
         companyName = "未知公司";
     }
     
-    const prompt = `生成专业PE访谈纪要：
+    try {
+        const prompts = await loadFastPrompts();
+        const composePrompt = prompts.fastComposeReport;
+        
+        if (!composePrompt) {
+            console.warn('Fast compose prompt not found, using fallback');
+            return `# ${companyName} 投资访谈报告\n\n基本信息分析完成`;
+        }
+        
+        const prompt = `${composePrompt.role}
+
+${composePrompt.task}
 
 公司：${companyName}
 信息：${JSON.stringify(organizedInfo, null, 2)}
 
 要求：
-- 专业投资风格
-- 数据用**粗体**标注
-- 章节清晰结构
-- 只用已有事实
-- 每个章节至少写2-3段详细内容
+${composePrompt.requirements.map(req => `- ${req}`).join('\n')}
 
 格式：
-### 公司概况
-### 业务模式  
-### 财务状况
-### 市场情况
-### 发展计划
+${composePrompt.reportStructure.join('\n')}
 
-直接输出格式化报告：`;
+${composePrompt.outputFormat}`;
 
-    console.log('FastComposeReport prompt:', prompt.substring(0, 500) + '...'); // Debug log
+        console.log('FastComposeReport prompt:', prompt.substring(0, 500) + '...'); // Debug log
 
-    try {
         const result = await model.generateContent(prompt);
         const reportText = result.response.text();
         
@@ -144,19 +176,26 @@ export async function fastComposeReport(organizedInfo, companyName, model) {
 
 // Fast Agent 4: Quick Quality Check - Streamlined
 export async function fastQualityCheck(report, model) {
-    const prompt = `快速评估报告质量：
+    try {
+        const prompts = await loadFastPrompts();
+        const qualityPrompt = prompts.fastQualityCheck;
+        
+        if (!qualityPrompt) {
+            console.warn('Fast quality prompt not found, using fallback');
+            return { score: 85, pass: true, issues: [], summary: "快速检查完成" };
+        }
+        
+        const prompt = `${qualityPrompt.role}
+
+${qualityPrompt.task}
 
 ${report.substring(0, 2000)}...
 
-JSON输出：
-{
-  "score": 85,
-  "pass": true,
-  "issues": [],
-  "summary": "质量评估"
-}`;
+评估标准：
+${qualityPrompt.evaluationCriteria.map(criteria => `- ${criteria}`).join('\n')}
 
-    try {
+${qualityPrompt.outputFormat}`;
+
         const result = await model.generateContent(prompt);
         const text = result.response.text();
         const jsonMatch = text.match(/\{[\s\S]*\}/);
@@ -172,15 +211,26 @@ JSON输出：
 
 // Fast Agent 5: Quick Formatting - Streamlined
 export async function fastFormatReport(report, model) {
-    const prompt = `快速格式化报告：
+    try {
+        const prompts = await loadFastPrompts();
+        const formatPrompt = prompts.fastFormatReport;
+        
+        if (!formatPrompt) {
+            console.warn('Fast format prompt not found, using fallback');
+            return report;
+        }
+        
+        const prompt = `${formatPrompt.role}
+
+${formatPrompt.task}
 
 ${report}
 
-要求：标题统一、数据加粗、格式规范
+要求：
+${formatPrompt.formattingRequirements.map(req => `- ${req}`).join('\n')}
 
-输出格式化报告：`;
+${formatPrompt.outputFormat}`;
 
-    try {
         const result = await model.generateContent(prompt);
         return result.response.text();
     } catch (error) {

@@ -1,341 +1,127 @@
 {
   "comprehensiveBPAnalysis": {
-    "role": "你是一位世界顶级的商业计划书分析专家，拥有20年分析经验，曾为数百家PE机构进行BP深度分析。",
-    "taskIntro": "请对以下商业计划书进行最深度、最全面的分析：",
-    "taskDetails": "分析任务（重点关注数据提取）：\n1. 逐页、逐章节完整解读所有内容，特别关注表格和图表\n2. 提取所有具体的数据、数字、百分比\n3. 竞争对手分析：\n   - 识别所有提到的竞争对手名称\n   - 找出任何关于竞争对手的收入、市场份额等数据\n   - 如果有对比表格，完整提取\n4. 财务数据提取：\n   - 历史收入、成本、利润数据\n   - 预测数据和增长率\n   - 融资历史和估值\n5. 团队背景深度挖掘：\n   - 创始人和核心团队的完整背景\n   - 过往经历中的具体成就和数据\n6. 产品与技术细节：\n   - 技术架构和独特性\n   - 产品功能的具体描述\n   - 专利和知识产权情况\n7. 市场数据收集：\n   - 目标市场规模的具体数字\n   - 增长率和趋势数据\n   - 客户案例和合作伙伴",
-    "outputFormat": "输出格式要求：\n1. 以章节形式组织（匹配BP原始结构）\n2. 每个数据点都要标注来源页码\n3. 对于表格数据，保持表格格式\n4. 对于竞争对手信息，创建对比表\n5. 突出所有具体的数字和百分比\n6. 如果某些重要信息缺失，明确指出\n7. 篇幅不限，越详细越好",
-    "thinkingPrompt": "## 分析思路\n\n请系统地分析这份商业计划书：\n\n1. **快速浏览**：先快速浏览全文，理解整体结构和主要内容板块\n\n2. **数据提取策略**：\n   - 重点关注所有包含数字、百分比、金额的段落\n   - 特别注意图表、表格中的数据\n   - 寻找时间序列数据（历史业绩、未来预测）\n\n3. **竞争分析重点**：\n   - 搜索所有竞争对手公司名称\n   - 提取竞争对手的任何量化信息\n   - 关注市场份额、收入规模等对比数据\n\n4. **信息完整性检查**：\n   - 确保不遗漏任何章节\n   - 验证关键数据是否都已提取\n   - 检查是否有隐含在文字描述中的数据\n\n5. **深度挖掘**：\n   - 分析数据之间的关联性\n   - 推断可能的隐含信息\n   - 评估数据的可信度和一致性"
+    "role": "PE analyst specializing in business plan data extraction",
+    "task": "Extract factual information from business plan documents for interview summary",
+    "extractionFocus": [
+      "Company overview and team details",
+      "Industry and market information", 
+      "Core business and operations",
+      "Financial data and performance",
+      "Investment and funding information"
+    ],
+    "outputFormat": "Present extracted information in clear paragraphs"
   },
   "deepExtractChunk": {
-    "role": "你是一位顶级的私募股权投资分析师，具有30年行业经验。请对以下访谈片段进行深度分析和完整信息提取。",
-    "requirements": [
-      "提取所有明确陈述的事实、数据、观点",
-      "识别并提取所有隐含的信息和背景",
-      "捕捉受访者的情绪、态度和未明说的担忧",
-      "分析话语中的逻辑关系和因果链条",
-      "提取所有人名、公司名、产品名、技术术语",
-      "识别可能的商业机会和风险信号",
-      "注意受访者回避或模糊处理的话题",
-      "提取时间线索和事件顺序",
-      "分析数据的可信度和一致性",
-      "推断行业背景和市场环境信息"
+    "role": "PE interview transcript analyst", 
+    "task": "Extract factual information from interview transcript segments",
+    "extractionFocus": [
+      "Company data: numbers, percentages, financial figures",
+      "Team: names, roles, backgrounds",
+      "Business: products, services, model",
+      "Market: industry, size, position",
+      "Timeline: dates, milestones"
     ],
-    "outputFormat": "输出要求：\n- 结构化呈现所有提取的信息\n- 区分显性信息和推断信息\n- 标注关键信息的重要程度\n- 保留原始表述的同时提供专业解读\n- 篇幅不限，确保无遗漏",
-    "thinkingPrompt": "## 深度提取思考\n\n在分析这个访谈片段时，我需要：\n\n1. **多层次理解**：\n   - 表面信息：直接陈述的事实和数据\n   - 深层含义：话语背后的意图和暗示\n   - 情境分析：为什么在此时说这些话\n\n2. **关键信息识别**：\n   - 量化数据：所有数字、百分比、金额\n   - 定性信息：战略、计划、观点、判断\n   - 人物关系：提到的人员及其角色\n   - 时间线索：过去、现在、未来的事件\n\n3. **批判性分析**：\n   - 信息的完整性：是否有遗漏或回避\n   - 逻辑的一致性：前后表述是否矛盾\n   - 数据的可靠性：是否需要进一步验证\n\n4. **行业视角**：\n   - 将信息放在行业背景下理解\n   - 识别行业特定的机会和挑战\n   - 评估竞争态势和市场地位\n\n5. **投资视角**：\n   - 评估投资价值和风险\n   - 识别尽职调查的关注点\n   - 判断管理团队的能力和诚信"
+    "outputFormat": "Present information in detailed paragraphs"
   },
   "architectInformation": {
-    "role": "你是一位顶级的信息架构师和私募股权分析专家。请将以下深度提取的信息构建成完整的知识图谱。",
-    "mainTask": "构建全面、立体、相互关联的信息架构，确保：",
-    "requirements": [
-      "建立清晰的信息层级和分类体系",
-      "识别并强化信息间的关联关系",
-      "构建时间线和事件发展脉络",
-      "创建多维度的分析框架（财务、技术、市场、团队）",
-      "整合碎片信息形成完整图景",
-      "识别信息空白和需要进一步调查的领域",
-      "构建因果关系链和影响路径",
-      "创建可视化的信息地图",
-      "确保定量和定性信息的平衡",
-      "建立风险-机会矩阵"
-    ],
-    "outputStructure": {
-      "coreBusinessModel": "核心商业模式的完整描述",
-      "financialArchitecture": "财务数据的结构化呈现",
-      "competitiveLandscape": "竞争格局的多维分析",
-      "teamCapabilities": "团队能力图谱",
-      "technologyStack": "技术架构和护城河",
-      "marketDynamics": "市场动态和趋势",
-      "riskOpportunityMatrix": "风险机会评估矩阵",
-      "timelineEvents": "关键事件时间线",
-      "informationGaps": "信息缺口清单",
-      "investmentThesis": "投资逻辑框架"
+    "role": "Information organizer for PE reports",
+    "task": "Organize extracted information into required report sections",
+    "organizationStructure": {
+      "公司简介": "Company overview and core team",
+      "行业情况": "Industry and market information", 
+      "主营业务": "Core business and operations",
+      "财务情况": "Financial data and performance",
+      "融资情况": "Investment and funding history"
     },
-    "thinkingPrompt": "## 信息架构构建\n\n构建知识图谱时的思考过程：\n\n1. **宏观框架设计**：\n   - 确定核心主题和次要主题\n   - 建立信息的层级关系\n   - 设计交叉引用系统\n\n2. **信息整合策略**：\n   - 识别重复信息并去重\n   - 发现信息之间的隐含联系\n   - 填补逻辑链条中的空白\n\n3. **多维度组织**：\n   - 时间维度：历史→现在→未来\n   - 主题维度：技术/市场/财务/团队\n   - 重要性维度：核心→支撑→补充\n\n4. **关系网络构建**：\n   - 因果关系：A导致B\n   - 相关关系：A与B相关\n   - 依赖关系：A依赖于B\n   - 竞争关系：A与B竞争\n\n5. **投资视角整合**：\n   - 价值创造逻辑\n   - 风险识别和缓解\n   - 退出路径分析\n   - 投后管理要点"
+    "outputFormat": "Return JSON with organized information by section"
   },
   "masterComposeReport": {
-    "role": "你是一位世界顶级的私募股权投资报告撰写专家，曾为全球顶级PE机构撰写过数百份投资分析报告。",
-    "taskDescription": "基于提供的结构化信息和原始访谈记录，撰写一份达到国际顶级PE机构（如KKR、黑石、凯雷）标准的投资访谈报告。",
+    "role": "PE report writer",
+    "task": "Generate interview summary report with specific sections only",
     "reportStructure": {
-      "executiveSummary": {
-        "title": "执行摘要",
-        "requirements": [
-          "3-5个核心投资亮点",
-          "关键财务指标和估值",
-          "主要风险和缓解措施",
-          "投资建议和下一步行动"
-        ]
+      "companyIntro": {
+        "title": "【公司简介】",
+        "subsections": ["公司概述", "核心团队"]
       },
-      "companyOverview": {
-        "title": "公司概况",
-        "requirements": [
-          "业务模式深度解析",
-          "发展历程和关键里程碑",
-          "产品/服务详细描述",
-          "核心竞争优势分析"
-        ]
+      "industry": {
+        "title": "【行业情况】"
       },
-      "marketAnalysis": {
-        "title": "市场分析",
-        "requirements": [
-          "TAM/SAM/SOM分析",
-          "市场增长驱动因素",
-          "竞争格局深度分析",
-          "市场进入壁垒"
-        ]
+      "business": {
+        "title": "【主营业务】"
       },
-      "financialAnalysis": {
-        "title": "财务分析",
-        "requirements": [
-          "历史财务表现（3-5年）",
-          "收入模式和质量分析",
-          "成本结构和盈利能力",
-          "现金流和资本效率"
-        ]
+      "financials": {
+        "title": "【财务情况】"
       },
-      "managementTeam": {
-        "title": "管理团队",
-        "requirements": [
-          "核心团队背景和track record",
-          "组织架构和决策机制",
-          "激励机制和股权结构",
-          "团队稳定性和文化"
-        ]
-      },
-      "investmentHighlights": {
-        "title": "投资亮点",
-        "requirements": [
-          "独特价值主张",
-          "可扩展性分析",
-          "护城河评估",
-          "退出机会分析"
-        ]
-      },
-      "riskFactors": {
-        "title": "风险因素",
-        "requirements": [
-          "市场风险",
-          "运营风险",
-          "财务风险",
-          "监管风险",
-          "风险缓解策略"
-        ]
-      },
-      "dueDiligenceItems": {
-        "title": "尽职调查要点",
-        "requirements": [
-          "需要进一步验证的信息",
-          "专家访谈建议",
-          "财务尽调重点",
-          "法律尽调关注点"
-        ]
+      "funding": {
+        "title": "【融资情况】",
+        "subsections": ["融资历史"]
       }
     },
     "writingStandards": [
-      "使用专业的金融术语和投资语言",
-      "数据驱动，每个观点都有支撑",
-      "保持客观中立的分析视角",
-      "逻辑清晰，层次分明",
-      "篇幅要求：8000-12000字",
-      "包含必要的图表和数据可视化建议"
-    ],
-    "thinkingPrompt": "## 报告撰写思路\n\n撰写世界级PE投资报告的思考过程：\n\n1. **读者定位**：\n   - 投资委员会成员\n   - 需要快速理解投资逻辑\n   - 关注风险收益比\n   - 重视可执行性\n\n2. **信息层次**：\n   - 执行摘要：核心结论\n   - 主体部分：详细分析\n   - 附录：支撑数据\n\n3. **叙事逻辑**：\n   - 从宏观到微观\n   - 从机会到风险\n   - 从定性到定量\n   - 从现状到未来\n\n4. **专业标准**：\n   - 类比标杆交易\n   - 引用行业数据\n   - 使用标准估值方法\n   - 提供敏感性分析\n\n5. **价值创造**：\n   - 识别价值创造杠杆\n   - 量化增长潜力\n   - 评估协同效应\n   - 设计退出路径"
+      "Use factual information from interview only",
+      "通过专业、精确的方式，提供具有深度洞察的行业和企业报告",
+      "Include specific numbers and data points",
+      "Keep sections concise and focused"
+    ]
   },
   "verifyCitations": {
-    "role": "你是一位严格的事实核查专家和引用验证师。请对以下报告进行全面的事实核查和引用验证。",
-    "verificationTasks": [
-      "验证所有数据的准确性和一致性",
-      "检查财务数字的逻辑关系",
-      "确认时间线的准确性",
-      "验证人名、职位、公司名称的准确性",
-      "检查百分比和增长率计算",
-      "确认引用内容与原始资料的一致性",
-      "识别可能的数据冲突或矛盾",
-      "标注需要进一步确认的信息",
-      "评估信息来源的可靠性",
-      "检查行业数据的时效性"
+    "role": "Data verification specialist",
+    "task": "Verify accuracy of key data in interview summary",
+    "checkPoints": [
+      "Financial figures consistency",
+      "Timeline accuracy", 
+      "Names and titles correctness"
     ],
-    "outputRequirements": {
-      "verificationReport": "详细的验证报告",
-      "issuesFound": "发现的问题清单",
-      "recommendations": "改进建议",
-      "confidenceLevel": "整体可信度评分"
-    },
-    "thinkingPrompt": "## 事实核查思路\n\n进行专业事实核查的系统方法：\n\n1. **数据一致性检查**：\n   - 交叉验证不同来源的数据\n   - 检查计算逻辑\n   - 验证趋势的合理性\n\n2. **逻辑验证**：\n   - 因果关系是否成立\n   - 时间顺序是否正确\n   - 数据之间是否存在矛盾\n\n3. **完整性评估**：\n   - 关键信息是否齐全\n   - 是否存在明显遗漏\n   - 引用是否完整准确\n\n4. **可靠性分级**：\n   - 一手资料 vs 二手资料\n   - 官方数据 vs 估计数据\n   - 最新数据 vs 过时数据\n\n5. **风险标注**：\n   - 哪些数据需要进一步验证\n   - 哪些结论基于假设\n   - 哪些信息可能存在偏差"
+    "outputFormat": "JSON with verification status and issues found"
   },
   "validateExcellence": {
-    "role": "你是一位世界顶级的投资报告质量评估专家，曾为KKR、黑石、红杉等顶级机构制定报告标准。",
-    "evaluationCriteria": {
-      "contentQuality": {
-        "depth": "分析深度（是否触及本质问题）",
-        "breadth": "覆盖广度（是否全面完整）",
-        "insight": "洞察力（是否有独特见解）",
-        "accuracy": "准确性（数据和事实是否准确）"
-      },
-      "structureLogic": {
-        "flow": "逻辑流畅性",
-        "hierarchy": "层次清晰度",
-        "coherence": "内容连贯性",
-        "balance": "详略得当"
-      },
-      "professionalStandards": {
-        "terminology": "专业术语使用",
-        "methodology": "分析方法论",
-        "formatting": "格式规范性",
-        "readability": "可读性"
-      },
-      "investmentValue": {
-        "actionability": "可执行性",
-        "riskAssessment": "风险评估充分性",
-        "valueProposition": "价值主张清晰度",
-        "decisionSupport": "决策支持力度"
-      }
-    },
-    "scoringSystem": {
-      "worldClass": "90-100分：达到全球顶级PE标准",
-      "excellent": "80-89分：优秀，minor improvements needed",
-      "good": "70-79分：良好，some enhancements required",
-      "needsWork": "60-69分：需要substantial improvements"
-    },
-    "outputFormat": {
-      "overallScore": "总体评分",
-      "dimensionScores": "各维度评分",
-      "strengths": "报告亮点",
-      "weaknesses": "不足之处",
-      "specificSuggestions": "具体改进建议",
-      "benchmarkComparison": "与标杆报告对比"
-    },
-    "thinkingPrompt": "## 卓越标准评估\n\n评估投资报告是否达到世界级标准：\n\n1. **标杆对照**：\n   - 对比KKR的严谨性\n   - 对比黑石的全面性\n   - 对比红杉的洞察力\n   - 对比凯雷的实用性\n\n2. **读者体验**：\n   - IC成员能否快速抓住要点\n   - 分析师能否找到所需细节\n   - 投后团队能否据此开展工作\n\n3. **决策价值**：\n   - 是否提供清晰的投资建议\n   - 风险是否被充分识别和量化\n   - 价值创造路径是否明确\n\n4. **专业水准**：\n   - 是否体现行业best practice\n   - 分析框架是否严谨\n   - 数据使用是否恰当\n\n5. **差异化价值**：\n   - 是否有独特的洞察\n   - 是否发现了others missed的机会\n   - 是否提供了创新的解决方案"
+    "role": "Report quality assessor",
+    "task": "Evaluate interview summary completeness",
+    "evaluationCriteria": [
+      "Required sections coverage",
+      "Information accuracy",
+      "Professional presentation"
+    ],
+    "outputFormat": "JSON with score, pass status, and recommendations"
   },
   "intelligentEnrichment": {
-    "role": "你是一位顶级的信息增强专家，专门负责在原始资料中深度挖掘遗漏信息并补充到报告中。",
-    "enrichmentStrategy": [
-      "扫描所有原始资料寻找未被充分利用的信息",
-      "识别报告中的信息空白和薄弱环节",
-      "从访谈细节中推断隐含信息",
-      "连接分散的信息点形成新洞察",
-      "补充行业背景和市场context",
-      "增加定量分析和数据支撑",
-      "丰富案例和具体例证",
-      "深化因果关系分析",
-      "扩展竞争对手信息",
-      "补充监管和政策影响分析"
+    "role": "Information enhancement specialist",
+    "task": "Find additional relevant details from interview materials",
+    "searchStrategy": [
+      "Re-examine transcripts for missed facts",
+      "Identify gaps in required sections",
+      "Extract additional context"
     ],
-    "enrichmentFocus": {
-      "dataEnrichment": "数据增强（补充具体数字和指标）",
-      "contextEnrichment": "背景增强（补充行业和市场信息）",
-      "analysisEnrichment": "分析增强（深化逻辑和洞察）",
-      "exampleEnrichment": "案例增强（补充具体实例）"
-    },
-    "outputFormat": {
-      "enrichmentList": "增强点清单",
-      "enrichedContent": "增强后的内容",
-      "sourceReference": "信息来源标注",
-      "confidenceLevel": "增强内容可信度"
-    },
-    "thinkingPrompt": "## 智能增强思考\n\n如何从原始资料中挖掘更多价值：\n\n1. **信息挖掘**：\n   - 重读原始访谈，寻找被忽视的细节\n   - 分析语境，理解未明说的信息\n   - 连接碎片信息，形成完整图景\n\n2. **空白填补**：\n   - 识别报告中缺失的关键信息\n   - 从现有信息推断可能的答案\n   - 标注推断的依据和可信度\n\n3. **深度分析**：\n   - 不满足于表面信息\n   - 追问"为什么"和"如何"\n   - 探索信息背后的商业逻辑\n\n4. **价值创造**：\n   - 将信息转化为洞察\n   - 将洞察转化为建议\n   - 将建议转化为行动方案\n\n5. **质量控制**：\n   - 确保增强内容有据可依\n   - 保持客观中立\n   - 标注推测和确定信息的区别"
+    "outputFormat": "JSON with new information and target sections"
   },
   "integrateEnhancements": {
-    "role": "你是一位顶级的内容整合专家。请将增强数据无缝整合到报告中，确保内容流畅自然。",
-    "integrationPrinciples": [
-      "保持原报告的整体风格和语调",
-      "确保新增内容与现有内容的逻辑连贯",
-      "避免重复，去除冗余信息",
-      "保持段落之间的自然过渡",
-      "确保数据引用的一致性",
-      "维护报告的整体平衡性",
-      "强化而非削弱原有观点",
-      "保持专业性和可读性"
+    "role": "Content integration specialist", 
+    "task": "Merge additional information into interview summary",
+    "integrationRules": [
+      "Maintain consistent style",
+      "Preserve section structure",
+      "Remove redundancy"
     ],
-    "integrationTechniques": {
-      "seamlessBlending": "无缝融合技术",
-      "logicalBridging": "逻辑桥接方法",
-      "contentRebalancing": "内容再平衡",
-      "transitionOptimization": "过渡优化"
-    },
-    "qualityChecks": [
-      "整合后的连贯性检查",
-      "风格一致性验证",
-      "信息完整性确认",
-      "逻辑通顺性审查"
-    ],
-    "thinkingPrompt": "## 内容整合艺术\n\n实现完美内容整合的方法：\n\n1. **风格匹配**：\n   - 分析原报告的写作风格\n   - 调整新内容以匹配风格\n   - 保持专业术语的一致性\n\n2. **逻辑融合**：\n   - 找到最佳插入点\n   - 创建自然的过渡句\n   - 确保前后逻辑顺畅\n\n3. **结构优化**：\n   - 可能需要调整段落顺序\n   - 合并相似内容\n   - 创建新的子标题\n\n4. **平衡把握**：\n   - 不让新内容喧宾夺主\n   - 保持各部分比例协调\n   - 强化而非改变核心观点\n\n5. **最终润色**：\n   - 统一数据表述方式\n   - 检查交叉引用\n   - 确保整体阅读体验"
+    "outputFormat": "Complete integrated report"
   },
   "excellenceFormatter": {
-    "role": "你是一位顶级的专业报告格式化专家，专门为全球顶级PE机构制作投资报告。",
-    "formattingStandards": {
-      "structure": {
-        "hierarchy": "清晰的多级标题体系",
-        "numbering": "专业的章节编号",
-        "toc": "详细的目录结构",
-        "crossReferences": "完善的交叉引用"
-      },
-      "visualElements": {
-        "charts": "数据图表建议",
-        "tables": "关键数据表格",
-        "highlights": "重点信息突出",
-        "summaryBoxes": "摘要框设计"
-      },
-      "typography": {
-        "consistency": "字体和格式一致性",
-        "emphasis": "重点内容强调方式",
-        "whitespace": "合理的留白设计",
-        "readability": "最优可读性"
-      },
-      "professional": {
-        "citations": "规范的引用格式",
-        "terminology": "术语表和缩写表",
-        "disclaimer": "必要的免责声明",
-        "confidentiality": "保密标识"
-      }
-    },
-    "deliverables": {
-      "executiveVersion": "高管版本（精简）",
-      "detailVersion": "详细版本（完整）",
-      "presentation": "演示文稿要点",
-      "dataAppendix": "数据附录"
-    },
-    "thinkingPrompt": "## 专业格式化思考\n\n创建世界级投资报告格式：\n\n1. **读者友好性**：\n   - 繁忙的IC成员需要快速浏览\n   - 分析师需要深入细节\n   - 使用视觉层次引导阅读\n\n2. **信息架构**：\n   - 金字塔原理：结论先行\n   - 并列结构：逻辑清晰\n   - 递进关系：层层深入\n\n3. **视觉设计**：\n   - Less is more\n   - 数据可视化优于文字描述\n   - 颜色使用要专业克制\n\n4. **专业规范**：\n   - 遵循机构style guide\n   - 保持版式的一致性\n   - 注重细节的完美\n\n5. **实用导向**：\n   - 方便打印和电子阅读\n   - 支持快速定位信息\n   - 便于会议讨论使用"
+    "role": "Professional report formatter",
+    "task": "Format interview summary to professional standards",
+    "formattingRules": [
+      "Clear section headings (### main, #### sub)",
+      "Bold important data with **bold**",
+      "Consistent paragraph spacing"
+    ],
+    "outputFormat": "Complete formatted report"
   },
   "finalQualityInspection": {
-    "role": "你是一位资深的质量保证总监，负责确保报告达到出版级别的质量标准。",
-    "inspectionChecklist": {
-      "accuracy": {
-        "dataAccuracy": "所有数据的准确性",
-        "factualAccuracy": "事实陈述的准确性",
-        "calculationAccuracy": "计算和推导的准确性",
-        "citationAccuracy": "引用的准确性"
-      },
-      "completeness": {
-        "contentCompleteness": "内容的完整性",
-        "analysisCompleteness": "分析的完整性",
-        "disclosureCompleteness": "披露的完整性",
-        "appendixCompleteness": "附录的完整性"
-      },
-      "consistency": {
-        "dataConsistency": "数据的一致性",
-        "terminologyConsistency": "术语的一致性",
-        "formatConsistency": "格式的一致性",
-        "styleConsistency": "风格的一致性"
-      },
-      "professionalism": {
-        "language": "语言的专业性",
-        "presentation": "呈现的专业性",
-        "objectivity": "分析的客观性",
-        "ethics": "职业道德合规性"
-      }
-    },
-    "qualityMetrics": {
-      "errorRate": "错误率（目标<0.1%）",
-      "clarityScore": "清晰度评分（1-10）",
-      "completenessScore": "完整性评分（1-10）",
-      "professionalismScore": "专业性评分（1-10）"
-    },
-    "finalActions": {
-      "corrections": "必要的修正",
-      "enhancements": "可选的增强",
-      "signOff": "质量签核",
-      "distribution": "发布建议"
-    },
-    "thinkingPrompt": "## 最终质量保证\n\n确保报告达到最高标准：\n\n1. **零错误目标**：\n   - 每个数字都要验证\n   - 每个名称都要核对\n   - 每个结论都要有依据\n\n2. **读者测试**：\n   - 站在IC成员角度审视\n   - 考虑可能的questions\n   - 确保关键信息突出\n\n3. **专业标准**：\n   - 对标最好的投资报告\n   - 确保超越客户期望\n   - 体现机构的专业水准\n\n4. **风险控制**：\n   - 避免误导性陈述\n   - 标注假设和局限\n   - 保持适当的谨慎\n\n5. **最终确认**：\n   - 这份报告是否ready for IC?\n   - 是否proud to put our name on it?\n   - 是否会成为a benchmark?"
+    "role": "Final quality controller",
+    "task": "Final review of interview summary", 
+    "inspectionChecklist": [
+      "All required sections present",
+      "Data accuracy verified",
+      "Professional formatting consistent"
+    ],
+    "outputFormat": "JSON with final approval status and any needed corrections"
   }
 }
