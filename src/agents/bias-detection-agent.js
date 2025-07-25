@@ -1,4 +1,5 @@
 // Bias Detection Agent - Identifies and removes subjective language and AI interpretations
+import { generateWithRetry, convertContentParts } from '../utils/gemini-wrapper.js';
 
 export async function detectAndRemoveBias(report, model) {
     const prompt = `你是一位严格的事实核查专家。通过专业、精确的方式，提供具有深度洞察的行业和企业分析报告。
@@ -27,8 +28,8 @@ ${report}
 输出修正后的客观报告，只保留可验证的事实和具体数据。`;
 
     try {
-        const result = await model.generateContent(prompt);
-        return result.response.text();
+        const parts = convertContentParts([{ text: prompt }]);
+        return await generateWithRetry(parts, '事实核查专家', -1);
     } catch (error) {
         console.error('Error in bias detection:', error);
         return report; // Return original if bias detection fails
@@ -56,8 +57,8 @@ ${content}
 ...`;
 
     try {
-        const result = await model.generateContent(prompt);
-        return result.response.text();
+        const parts = convertContentParts([{ text: prompt }]);
+        return await generateWithRetry(parts, '事实提取助手', -1);
     } catch (error) {
         console.error('Error in facts extraction:', error);
         return content;

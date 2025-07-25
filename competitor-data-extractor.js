@@ -1,4 +1,5 @@
 // Specialized agent for extracting competitor revenue and market data from PDFs
+import { generateWithRetry, convertContentParts } from './src/utils/gemini-wrapper.js';
 
 export async function extractCompetitorData(fileUris, model) {
     if (!fileUris || fileUris.length === 0) {
@@ -63,8 +64,9 @@ export async function extractCompetitorData(fileUris, model) {
 重要：如果文档中包含表格、图表或数据列表，请逐一提取所有数字。不要遗漏任何竞争对手的财务数据。` });
 
     try {
-        const result = await model.generateContent(contentParts);
-        return result.response.text();
+        const converted = convertContentParts(contentParts);
+        const result = await generateWithRetry(converted, '竞争分析专家', -1);
+        return result;
     } catch (error) {
         console.error('Error in competitor data extraction:', error);
         return `竞争对手数据提取失败: ${error.message}`;
