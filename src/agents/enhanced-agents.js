@@ -2,7 +2,6 @@
 // This file contains the complete enhanced agent architecture for generating
 // world-class private equity interview reports using Gemini Pro's thinking capabilities
 
-import { generateWithThinking, generateWithFilesAndThinking } from '../config/gemini-config.js';
 import { compactChineseBullets } from '../utils/utils.js';
 import { initGeminiClient, generateWithRetry, convertContentParts } from '../utils/gemini-wrapper.js';
 
@@ -65,7 +64,8 @@ async function analyzeIndividualFile(file, index, model, genAI) {
             const convertedParts = convertContentParts(contentParts);
             result = await generateWithRetry(convertedParts, filePrompt.role, -1); // Use dynamic thinking
         } else {
-            result = await generateWithThinking(contentParts, model, 'Extract all structured data including tables, charts, and key information');
+            const convertedParts = convertContentParts(contentParts);
+            result = await generateWithRetry(convertedParts, filePrompt.role, 32000);
         }
         
         console.log(`✅ 文档 ${file.displayName} 分析成功 - 提取长度: ${result?.length || 0} 字符`);
@@ -168,7 +168,8 @@ ${extractPrompt.outputFormat}` }
             });
         }
         
-        const result = await generateWithThinking(contentParts, model, 'Extract key information with BP context');
+        const convertedParts = convertContentParts(contentParts);
+        const result = await generateWithRetry(convertedParts, extractPrompt.role, 32000);
         return result;
         
     } catch (error) {
@@ -202,7 +203,8 @@ ${allInfo.substring(0, 15000)}
 
 ${archPrompt.outputFormat}`;
         
-        const result = await generateWithThinking(prompt, model, 'Organize extracted information into structured sections');
+        const parts = convertContentParts([{ text: prompt }]);
+        const result = await generateWithRetry(parts, archPrompt.role, 32000);
         
         try {
             return JSON.parse(result);
@@ -242,7 +244,8 @@ ${JSON.stringify(composePrompt.reportStructure, null, 2)}
 写作标准：
 ${composePrompt.writingStandards.map((std, i) => `${i + 1}. ${std}`).join('\n')}`;
         
-        const result = await generateWithThinking(prompt, model, 'Generate comprehensive PE interview report');
+        const parts = convertContentParts([{ text: prompt }]);
+        const result = await generateWithRetry(parts, composePrompt.role, 32000);
         return result;
         
     } catch (error) {
@@ -302,7 +305,8 @@ ${transcript}` }
         
         contentParts.push({ text: `\n\n请按照以下格式输出验证结果：\n${verifyPrompt.outputFormat}` });
         
-        const result = await generateWithThinking(contentParts, model, 'Verify data accuracy against all available sources');
+        const convertedParts = convertContentParts(contentParts);
+        const result = await generateWithRetry(convertedParts, verifyPrompt.role, 32000);
         
         try {
             return JSON.parse(result);
@@ -341,7 +345,8 @@ export async function crossValidateFacts(report, combinedAnalyses, fileSummaries
         const results = [];
         for (const fact of uniqueFacts) {
             const prompt = `${factPrompt.role}\n${factPrompt.task}\n\n事实: ${fact}\n\n报告内容:\n${report}\n\n${factPrompt.outputFormat}`;
-            const res = await generateWithThinking(prompt, model, 'Cross validate single fact');
+            const parts = convertContentParts([{ text: prompt }]);
+            const res = await generateWithRetry(parts, factPrompt.role, -1);
             results.push({ fact, present: /^yes/i.test(res.trim()), raw: res.trim() });
         }
         return results;
@@ -403,7 +408,8 @@ ${combinedAnalyses || '无商业计划书数据'}` }
         
         contentParts.push({ text: `\n\n请按照以下格式输出评估结果：\n${JSON.stringify(validatePrompt.outputFormat, null, 2)}` });
         
-        const result = await generateWithThinking(contentParts, model, 'Evaluate report quality against all available data sources');
+        const convertedParts = convertContentParts(contentParts);
+        const result = await generateWithRetry(convertedParts, validatePrompt.role, 32000);
         
         try {
             return JSON.parse(result);
@@ -466,7 +472,8 @@ ${combinedAnalyses || '无商业计划书数据'}` }
         
         contentParts.push({ text: `\n\n请按照以下格式输出增强内容：\n${JSON.stringify(enrichPrompt.outputFormat, null, 2)}` });
         
-        const result = await generateWithThinking(contentParts, model, 'Find additional relevant information from all sources to enrich the report');
+        const convertedParts = convertContentParts(contentParts);
+        const result = await generateWithRetry(convertedParts, enrichPrompt.role, 32000);
         
         try {
             return JSON.parse(result);
@@ -532,7 +539,8 @@ ${combinedAnalyses || '无商业计划书数据'}` }
         
         contentParts.push({ text: '\n\n请输出整合后的完整报告：' });
         
-        const result = await generateWithThinking(contentParts, model, 'Integrate enhancements with full context from all sources');
+        const convertedParts = convertContentParts(contentParts);
+        const result = await generateWithRetry(convertedParts, integratePrompt.role, 32000);
         return result;
         
     } catch (error) {
@@ -590,7 +598,8 @@ ${combinedAnalyses || '无商业计划书数据'}` }
         
         contentParts.push({ text: '\n\n请输出专业格式化后的报告：' });
         
-        const result = await generateWithThinking(contentParts, model, 'Format the report with full context understanding');
+        const convertedParts = convertContentParts(contentParts);
+        const result = await generateWithRetry(convertedParts, formatPrompt.role, 32000);
         return result;
         
     } catch (error) {
@@ -651,7 +660,8 @@ ${combinedAnalyses || '无商业计划书数据'}` }
         
         contentParts.push({ text: `\n\n请按照以下格式输出检查结果：\n${inspectPrompt.outputFormat}` });
         
-        const result = await generateWithThinking(contentParts, model, 'Perform comprehensive final quality inspection');
+        const convertedParts = convertContentParts(contentParts);
+        const result = await generateWithRetry(convertedParts, inspectPrompt.role, 32000);
         
         try {
             return JSON.parse(result);

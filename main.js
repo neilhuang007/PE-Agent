@@ -23,14 +23,28 @@ import {
 import { detectAndRemoveBias } from './src/agents/bias-detection-agent.js';
 import { findRevenuePatterns } from './competitor-data-extractor.js';
 import { orchestrateMasterSubAgentSystem } from './master-subagent-system.js';
-import { createModelConfig } from './src/config/gemini-config.js';
 import { readPDFs } from './src/utils/pdf-handler.js';
-import { uploadFileToGemini, deleteFileFromGemini } from './src/utils/gemini-files.js';
 import { chunkTranscript, updateProgress, getApiKey, saveApiKey, downloadReport, compactChineseBullets } from './src/utils/utils.js';
 import { finalReportFormatter, quickFinalFormatter, formatForDisplay } from './src/agents/final-formatter.js';
 
 let currentReport = '';
 let allUploadedFiles = []; // Store all uploaded files across multiple sessions
+
+// Placeholder functions for file upload/delete until proper implementation
+async function uploadFileToGemini(file, apiKey) {
+    console.warn('uploadFileToGemini not implemented, returning mock data');
+    return {
+        displayName: file.name,
+        mimeType: file.type,
+        uri: 'local_' + Date.now(),
+        content: await file.text()
+    };
+}
+
+async function deleteFileFromGemini(uri, apiKey) {
+    console.warn('deleteFileFromGemini not implemented');
+    return true;
+}
 
 // Initialize Gemini AI
 function initializeGemini() {
