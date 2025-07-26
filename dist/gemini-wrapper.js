@@ -1,17 +1,9 @@
 import { GoogleGenAI, } from '@google/genai';
-import { HttpsProxyAgent } from 'https-proxy-agent';
 let ai = null;
-export function initGeminiClient(apiKey, proxyUrl) {
-    const config = {
+export function initGeminiClient(apiKey) {
+    ai = new GoogleGenAI({
         apiKey: apiKey,
-    };
-    if (proxyUrl) {
-        const agent = new HttpsProxyAgent(proxyUrl);
-        config.requestOptions = {
-            agent: agent
-        };
-    }
-    ai = new GoogleGenAI(config);
+    });
 }
 export function convertContentParts(parts) {
     const userParts = [];

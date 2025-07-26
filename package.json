@@ -4,10 +4,18 @@
   "type": "module",
   "dependencies": {
     "@google/genai": "^1.11.0",
-    "mime": "^4.0.7"
+    "https-proxy-agent": "^7.0.6",
+    "mime": "^4.0.7",
+    "node-fetch": "^2.7.0",
+    "socks-proxy-agent": "^8.0.5"
   },
   "devDependencies": {
     "@types/node": "^24.1.0",
+    "@types/node-fetch": "^2.6.12",
     "typescript": "^5.8.3"
+  },
+  "scripts": {
+    "test": "tsc && node dist/utils/gemini-wrapper.test.js",
+    "test:gemini": "GEMINI_API_KEY=$GEMINI_API_KEY npm run test"
   }
 }
