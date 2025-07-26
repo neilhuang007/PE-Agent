@@ -1,17 +1,22 @@
 import { GoogleGenAI, } from '@google/genai';
+import fetch from 'node-fetch';
 import { HttpsProxyAgent } from 'https-proxy-agent';
 let ai = null;
+let useProxy = false;
+let proxyConfig = null;
+const GEMINI_API_BASE = 'https://generativelanguage.googleapis.com/v1beta/models';
 export function initGeminiClient(apiKey, proxyUrl) {
-    const config = {
-        apiKey: apiKey,
-    };
     if (proxyUrl) {
-        const agent = new HttpsProxyAgent(proxyUrl);
-        config.requestOptions = {
-            agent: agent
-        };
+        useProxy = true;
+        proxyConfig = { apiKey, proxyUrl };
+        console.log('Initialized with proxy:', proxyUrl);
     }
-    ai = new GoogleGenAI(config);
+    else {
+        useProxy = false;
+        ai = new GoogleGenAI({
+            apiKey: apiKey,
+        });
+    }
 }
 export function convertContentParts(parts) {
     const userParts = [];
@@ -25,7 +30,39 @@ export function convertContentParts(parts) {
     }
     return [{ role: 'user', parts: userParts }];
 }
+async function callGeminiDirect(contents, systemPrompt, thinkingBudget, model) {
+    if (!proxyConfig)
+        throw new Error('Proxy config not initialized');
+    const url = `${GEMINI_API_BASE}/${model}:generateContent?key=${proxyConfig.apiKey}`;
+    const body = {
+        contents,
+        generationConfig: {
+            thinkingConfig: {
+                thinkingBudget
+            }
+        },
+        systemInstruction: systemPrompt ? { parts: [{ text: systemPrompt }] } : undefined
+    };
+    const fetchOptions = {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(body),
+        agent: new HttpsProxyAgent(proxyConfig.proxyUrl)
+    };
+    const response = await fetch(url, fetchOptions);
+    const data = await response.json();
+    if (!response.ok) {
+        throw new Error(`API Error: ${JSON.stringify(data)}`);
+    }
+    return data.candidates?.[0]?.content?.parts?.[0]?.text || '';
+}
 async function callGeminiStream(contents, systemPrompt, thinkingBudget = -1, model = 'gemini-2.5-pro') {
+    if (useProxy && proxyConfig) {
+        // Use direct API call when proxy is configured
+        return await callGeminiDirect(contents, systemPrompt, thinkingBudget, model);
+    }
     if (!ai)
         throw new Error('Gemini client not initialized');
     const config = {
