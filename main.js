@@ -1,5 +1,6 @@
 import { GoogleGenerativeAI } from 'https://esm.run/@google/generative-ai';
 import { initGeminiClient } from './src/utils/gemini-wrapper.js';
+import { uploadFile, deleteFile } from './src/utils/gemini-wrapper.js';
 import { 
     deepExtractChunk, 
     architectInformation, 
@@ -32,17 +33,21 @@ let allUploadedFiles = []; // Store all uploaded files across multiple sessions
 
 // Placeholder functions for file upload/delete until proper implementation
 async function uploadFileToGemini(file, apiKey) {
-    console.warn('uploadFileToGemini not implemented, returning mock data');
+    // Delegate to the wrapper helper and reformat the return value.
+    const uploaded = await uploadFile(file);
     return {
         displayName: file.name,
         mimeType: file.type,
-        uri: 'local_' + Date.now(),
-        content: await file.text()
+        uri: uploaded.uri,
+        name: uploaded.name,
+        // state is optional but returned from the wrapper
+        state: uploaded.state
     };
 }
 
-async function deleteFileFromGemini(uri, apiKey) {
-    console.warn('deleteFileFromGemini not implemented');
+
+async function deleteFileFromGemini(name, apiKey) {
+    await deleteFile(name);
     return true;
 }
 
@@ -54,6 +59,15 @@ function initializeGemini() {
         return null;
     }
     saveApiKey(apiKey);
+    
+    // Initialize the TypeScript Gemini client for file uploads if not already done
+    try {
+        initGeminiClient(apiKey);
+        console.log('✅ Gemini client initialized for file uploads');
+    } catch (error) {
+        console.error('❌ Failed to initialize Gemini client:', error);
+    }
+    
     return new GoogleGenerativeAI(apiKey);
 }
 
@@ -64,16 +78,7 @@ async function generateReport(e) {
     const genAI = initializeGemini();
     if (!genAI) return;
     
-    // Initialize the TypeScript Gemini client
-    try {
-        const apiKey = document.getElementById('apiKey').value.trim();
-        console.log('🔄 Attempting to initialize TypeScript Gemini client...');
-        initGeminiClient(apiKey);
-        console.log('✅ TypeScript Gemini client initialized successfully');
-    } catch (error) {
-        console.error('❌ Failed to initialize TypeScript Gemini client:', error);
-        console.log('Falling back to regular Gemini client...');
-    }
+    // Gemini client is already initialized in initializeGemini() or on API key input
     
     const generateBtn = document.getElementById('generateBtn');
     const progressContainer = document.getElementById('progressContainer');
@@ -423,18 +428,18 @@ function updateFilesList() {
 }
 
 // Remove a file from the uploaded files list
-window.removeFile = async function(index) {
+window.removeFile = async function (index) {
     const file = allUploadedFiles[index];
-    if (file && file.uri && !file.uri.startsWith('local_')) {
+    if (file && file.uri && !file.uri.startsWith('local_') && file.name) {
         try {
-            await deleteFileFromGemini(file.uri, getApiKey());
+            await deleteFileFromGemini(file.name, getApiKey());
         } catch (error) {
             console.error('Failed to delete file:', error);
         }
     }
     allUploadedFiles.splice(index, 1);
     updateFilesList();
-}
+};
 
 // Process selected files immediately when chosen
 async function processSelectedFiles(files) {
@@ -701,7 +706,32 @@ function displayEnhancementDetails(enhancementResults, container) {
 // Initialize event listeners when DOM is loaded
 document.addEventListener('DOMContentLoaded', () => {
     // Load saved API key if exists
-    getApiKey();
+    const savedKey = getApiKey();
+    
+    // If we have a saved API key, initialize the client immediately
+    if (savedKey) {
+        try {
+            initGeminiClient(savedKey);
+            console.log('✅ Gemini client initialized with saved API key');
+        } catch (error) {
+            console.error('❌ Failed to initialize Gemini client with saved key:', error);
+        }
+    }
+    
+    // API key input listener - initialize client when user enters/changes API key
+    document.getElementById('apiKey').addEventListener('blur', () => {
+        const apiKey = document.getElementById('apiKey').value.trim();
+        if (apiKey) {
+            saveApiKey(apiKey);
+            try {
+                initGeminiClient(apiKey);
+                console.log('✅ Gemini client initialized with new API key');
+            } catch (error) {
+                console.error('❌ Failed to initialize Gemini client:', error);
+                alert('无法初始化 Gemini 客户端。请检查您的 API Key。');
+            }
+        }
+    });
     
     // Event listeners
     document.getElementById('reportForm').addEventListener('submit', generateReport);

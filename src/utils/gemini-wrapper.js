@@ -79,6 +79,13 @@ async function callGeminiDirect(contents, systemPrompt, thinkingBudget, model) {
     if (systemPrompt) {
         body.systemInstruction = { parts: [{ text: systemPrompt }] };
     }
+    // Log the complete prompt
+    console.log('=== Gemini API Request ===');
+    console.log('Model:', model);
+    console.log('System Prompt:', systemPrompt);
+    console.log('Contents:', JSON.stringify(contents, null, 2));
+    console.log('Thinking Budget:', thinkingBudget);
+    console.log('========================');
     const fetchImpl = typeof window === 'undefined' ? await getNodeFetch() : fetchFn;
     const fetchOptions = {
         method: 'POST',
@@ -107,6 +114,13 @@ async function callGeminiStream(contents, systemPrompt, thinkingBudget = -1, mod
     }
     if (!ai)
         throw new Error('Gemini client not initialized');
+    // Log the complete prompt
+    console.log('=== Gemini API Request (Stream) ===');
+    console.log('Model:', model);
+    console.log('System Prompt:', systemPrompt);
+    console.log('Contents:', JSON.stringify(contents, null, 2));
+    console.log('Thinking Budget:', thinkingBudget);
+    console.log('==================================');
     const config = {
         thinkingConfig: { thinkingBudget },
         systemInstruction: [{ text: systemPrompt }]
@@ -132,4 +146,41 @@ export async function generateWithRetry(contents, systemPrompt, thinkingBudget =
         }
     }
     throw lastError;
+}
+/**
+ * Upload a browser File/Blob to Gemini.
+ * Waits for the file to become ACTIVE before resolving.
+ * Requires that initGeminiClient() has been called so `ai` is defined.
+ */
+export async function uploadFile(file) {
+    if (!ai)
+        throw new Error('Gemini client not initialized');
+    // Upload the file through the SDK
+    const uploaded = await ai.files.upload({
+        file,
+        config: { mimeType: file.type },
+    });
+    // Poll until ACTIVE
+    let fetched = uploaded;
+    if (fetched.state !== 'ACTIVE') {
+        for (let i = 0; i < 20 && fetched.state !== 'ACTIVE'; i++) {
+            await new Promise((res) => setTimeout(res, 1000));
+            fetched = await ai.files.get({ name: uploaded.name });
+        }
+    }
+    return {
+        name: fetched.name,
+        displayName: file.name,
+        mimeType: file.type,
+        uri: fetched.uri,
+        state: fetched.state,
+    };
+}
+/**
+ * Delete an uploaded file from Gemini by its resource name.
+ */
+export async function deleteFile(name) {
+    if (!ai)
+        throw new Error('Gemini client not initialized');
+    await ai.files.delete({ name });
 }

@@ -2,11 +2,9 @@
 // To run: node test-gemini.js
 // API key is loaded from .env file
 
-import { initGeminiClient, generateWithRetry, convertContentParts } from './src/utils/gemini-wrapper.js';
-import dotenv from 'dotenv';
+import 'dotenv/config';
 
-// Load environment variables from .env file
-dotenv.config();
+import { initGeminiClient, generateWithRetry, convertContentParts } from './src/utils/gemini-wrapper.js';
 
 async function runTests() {
   console.log('=== Gemini API Wrapper Tests ===\n');
@@ -46,8 +44,10 @@ async function runTests() {
   
   // Test 4: API call WITHOUT proxy (SDK mode)
   console.log('\nTest 4: API call without proxy (using SDK)');
-  const apiKey = "AIzaSyBJEc1aWcp2TK2NhiKeLhdMPExchGp8U7s";
-  
+  const apiKey = process.env.GEMINI_API_KEY;
+
+  console.log('  API key:', apiKey);
+
   if (!apiKey) {
     console.log('⚠ Skipped - Set GEMINI_API_KEY environment variable');
   } else {

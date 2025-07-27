@@ -135,7 +135,12 @@ export async function deepExtractChunk(chunk, index, transcript, combinedAnalyse
         
         // Build content parts with all context
         const contentParts = [
-            { text: `${extractPrompt.role}
+            { text: `${extractPrompt.task}
+            
+            focus on:
+            ${extractPrompt.focus.map((req, i) => `${i + 1}. ${req}`).join('\n')}
+            
+            ${extractPrompt.outputFormat}
 
 访谈片段 ${index + 1}:
 ${chunk}
@@ -144,12 +149,13 @@ ${chunk}
 ${transcript.substring(0, 5000)}...
 
 商业计划书分析（用于深度理解和交叉验证）:
-${combinedAnalyses ? combinedAnalyses.substring(0, 3000) : '无商业计划书数据'}...
+${combinedAnalyses ? combinedAnalyses : '无商业计划书数据'}
 
-${extractPrompt.focus.map((req, i) => `${i + 1}. ${req}`).join('\n')}
+` }];
 
-${extractPrompt.outputFormat}` }
-        ];
+
+        console.log(contentParts.text)
+
         
         // Add uploaded files for reference
         if (fileUris && fileUris.length > 0) {
@@ -167,7 +173,9 @@ ${extractPrompt.outputFormat}` }
                 }
             });
         }
-        
+
+        console.log(contentParts)
+
         const convertedParts = convertContentParts(contentParts);
         const result = await generateWithRetry(convertedParts, extractPrompt.role, 32000);
         return result;
@@ -269,7 +277,7 @@ export async function verifyCitations(report, transcript, combinedAnalyses, file
         const contentParts = [
             { text: `${verifyPrompt.role}
 
-${verifyPrompt.checkPoints.map((task, i) => `${i + 1}. ${task}`).join('\n')}
+${verifyPrompt.check ? verifyPrompt.check.map((task, i) => `${i + 1}. ${task}`).join('\n') : ''}
 
 压缩总结:
 ${combinedAnalyses}

@@ -11,8 +11,8 @@
     "outputFormat": "summarizing text for each using spartan tone of voice that includes all extracted data"
   },
   "deepExtractChunk": {
-    "role": "Agent that extracts information from interview segment.",
-    "task": "Find every financial figure, percentage, person name, company name, date.",
+    "role": "Agent that extracts information from interview segment",
+    "task": "task is to parse all information mentioned in this interview segment",
     "focus": [
       "ALL numbers and percentages",
       "ALL names (people, companies, products)",
