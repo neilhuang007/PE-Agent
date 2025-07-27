@@ -146,7 +146,7 @@ export async function deepExtractChunk(chunk, index, transcript, combinedAnalyse
 ${chunk}
 
 完整访谈上下文（用于理解背景）:
-${transcript.substring(0, 5000)}...
+${transcript}
 
 商业计划书分析（用于深度理解和交叉验证）:
 ${combinedAnalyses ? combinedAnalyses : '无商业计划书数据'}
@@ -162,7 +162,7 @@ ${combinedAnalyses ? combinedAnalyses : '无商业计划书数据'}
             contentParts.push({ text: '\n\n**参考文档用于信息提取:**' });
             fileUris.slice(0, 2).forEach(file => { // Limit to first 2 files to avoid overload
                 if (file.content) {
-                    contentParts.push({ text: `\n文档：${file.displayName}\n${file.content.substring(0, 1000)}...` });
+                    contentParts.push({ text: `\n文档：${file.displayName}\n${file.content}` });
                 } else {
                     contentParts.push({
                         fileData: {
@@ -207,7 +207,7 @@ ${archPrompt.task}
 ${Object.entries(archPrompt.sections).map(([key, desc], i) => `${i + 1}. ${key}: ${desc}`).join('\n')}
 
 信息源:
-${allInfo.substring(0, 15000)}
+${allInfo}
 
 ${archPrompt.outputFormat}`;
         

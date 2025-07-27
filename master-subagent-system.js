@@ -130,7 +130,7 @@ ${task.expected_improvement}
 "${task.original_quote}"
 
 **完整报告上下文：**
-${report.substring(0, 3000)}...
+${report}
 
 **访谈记录：**
 ${transcript}` }

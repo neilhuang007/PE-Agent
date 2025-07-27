@@ -12,8 +12,9 @@ export function chunkTranscript(transcript, maxChunks = 6) {
         chunks.push(paragraphs.slice(i, i + optimalChunkSize).join('\n\n'));
     }
     
-    // Ensure we don't have too many small chunks (limit to maxChunks for API efficiency)
-    return chunks.slice(0, maxChunks);
+    // chunks.length should already be <= maxChunks based on optimalChunkSize
+    // Return all chunks so no content is dropped
+    return chunks;
 }
 
 // Update progress UI
@@ -84,4 +85,18 @@ export function compactChineseBullets(text, maxChars = 10000) {
         .map(line => `• ${line}`)
         .join('\n');
     return chineseOnly.slice(0, maxChars);
+}
+
+// Build a raw draft from extracted information and file analyses
+export function assembleRawDraft(extractedChunks, fileAnalyses = '') {
+    const parts = [];
+    if (Array.isArray(extractedChunks)) {
+        parts.push(extractedChunks.join('\n\n'));
+    } else if (extractedChunks) {
+        parts.push(String(extractedChunks));
+    }
+    if (fileAnalyses) {
+        parts.push(String(fileAnalyses));
+    }
+    return parts.filter(Boolean).join('\n\n');
 }
