@@ -1,7 +1,21 @@
 // src/utils/gemini-wrapper.ts
 import { GoogleGenAI } from '@google/genai';
-import fetch from 'node-fetch';
-import { HttpsProxyAgent } from 'https-proxy-agent';
+let fetchFn = typeof fetch === 'function' ? fetch.bind(globalThis) : null;
+let HttpsProxyAgent = null;
+async function getNodeFetch() {
+    if (fetchFn)
+        return fetchFn;
+    const mod = await import('node-fetch');
+    fetchFn = mod.default;
+    return fetchFn;
+}
+async function getHttpsProxyAgent() {
+    if (HttpsProxyAgent)
+        return HttpsProxyAgent;
+    const mod = await import('https-proxy-agent');
+    HttpsProxyAgent = mod.HttpsProxyAgent;
+    return HttpsProxyAgent;
+}
 let ai = null;
 let useProxy = false;
 let proxyConfig = null;
@@ -14,6 +28,14 @@ const GEMINI_API_BASE = 'https://generativelanguage.googleapis.com/v1beta/models
  * @param proxyUrl  Optional proxy URL (e.g., "http://127.0.0.1:10809")
  */
 export function initGeminiClient(apiKey, proxyUrl) {
+    if (typeof window !== 'undefined') {
+        if (proxyUrl) {
+            console.warn('Proxy URL ignored in browser; configure your browser\'s proxy settings instead.');
+        }
+        useProxy = false;
+        ai = new GoogleGenAI({ apiKey });
+        return;
+    }
     if (proxyUrl) {
         useProxy = true;
         proxyConfig = { apiKey, proxyUrl };
@@ -57,14 +79,17 @@ async function callGeminiDirect(contents, systemPrompt, thinkingBudget, model) {
     if (systemPrompt) {
         body.systemInstruction = { parts: [{ text: systemPrompt }] };
     }
-    // Use HttpsProxyAgent so requests go through 127.0.0.1:10809
+    const fetchImpl = typeof window === 'undefined' ? await getNodeFetch() : fetchFn;
     const fetchOptions = {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(body),
-        agent: new HttpsProxyAgent(proxyConfig.proxyUrl)
+        body: JSON.stringify(body)
     };
-    const response = await fetch(url, fetchOptions);
+    if (typeof window === 'undefined') {
+        const Agent = await getHttpsProxyAgent();
+        fetchOptions.agent = new Agent(proxyConfig.proxyUrl);
+    }
+    const response = await fetchImpl(url, fetchOptions);
     const data = await response.json();
     if (!response.ok) {
         throw new Error(`API Error: ${JSON.stringify(data)}`);

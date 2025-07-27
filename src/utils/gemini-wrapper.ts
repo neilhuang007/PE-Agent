@@ -3,8 +3,23 @@
 
 import { GoogleGenAI } from '@google/genai';
 import type { Part, Content } from '@google/genai';
-import fetch from 'node-fetch';
-import { HttpsProxyAgent } from 'https-proxy-agent';
+
+let fetchFn: typeof fetch | null = typeof fetch === 'function' ? fetch.bind(globalThis) : null;
+let HttpsProxyAgent: any = null;
+
+async function getNodeFetch() {
+  if (fetchFn) return fetchFn;
+  const mod = await import('node-fetch');
+  fetchFn = mod.default as unknown as typeof fetch;
+  return fetchFn;
+}
+
+async function getHttpsProxyAgent() {
+  if (HttpsProxyAgent) return HttpsProxyAgent;
+  const mod = await import('https-proxy-agent');
+  HttpsProxyAgent = (mod as any).HttpsProxyAgent;
+  return HttpsProxyAgent;
+}
 
 let ai: GoogleGenAI | null = null;
 let useProxy = false;
@@ -21,6 +36,16 @@ const GEMINI_API_BASE =
  * @param proxyUrl  Optional proxy URL (e.g., "http://127.0.0.1:10809")
  */
 export function initGeminiClient(apiKey: string, proxyUrl?: string) {
+  if (typeof window !== 'undefined') {
+    if (proxyUrl) {
+      console.warn(
+        'Proxy URL ignored in browser; configure your browser\'s proxy settings instead.'
+      );
+    }
+    useProxy = false;
+    ai = new GoogleGenAI({ apiKey });
+    return;
+  }
   if (proxyUrl) {
     useProxy = true;
     proxyConfig = { apiKey, proxyUrl };
@@ -71,15 +96,18 @@ async function callGeminiDirect(
     body.systemInstruction = { parts: [{ text: systemPrompt }] };
   }
 
-  // Use HttpsProxyAgent so requests go through 127.0.0.1:10809
+  const fetchImpl = typeof window === 'undefined' ? await getNodeFetch() : fetchFn!;
   const fetchOptions: any = {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify(body),
-    agent: new HttpsProxyAgent(proxyConfig.proxyUrl)
+    body: JSON.stringify(body)
   };
+  if (typeof window === 'undefined') {
+    const Agent = await getHttpsProxyAgent();
+    fetchOptions.agent = new Agent(proxyConfig.proxyUrl);
+  }
 
-  const response = await fetch(url, fetchOptions);
+  const response = await fetchImpl(url, fetchOptions);
   const data = await response.json();
   if (!response.ok) {
     throw new Error(`API Error: ${JSON.stringify(data)}`);
