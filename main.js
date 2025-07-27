@@ -1,5 +1,5 @@
 import { GoogleGenerativeAI } from 'https://esm.run/@google/generative-ai';
-import { initGeminiClient } from './src/utils/gemini-wrapper.js';
+import { initGeminiClient, generateWithRetry, convertContentParts } from './src/utils/gemini-wrapper.js';
 import { uploadFile, deleteFile } from './src/utils/gemini-wrapper.js';
 import { 
     deepExtractChunk, 
@@ -25,7 +25,7 @@ import { detectAndRemoveBias } from './src/agents/bias-detection-agent.js';
 import { findRevenuePatterns } from './competitor-data-extractor.js';
 import { orchestrateMasterSubAgentSystem } from './master-subagent-system.js';
 import { readPDFs } from './src/utils/pdf-handler.js';
-import { chunkTranscript, updateProgress, getApiKey, saveApiKey, downloadReport, compactChineseBullets } from './src/utils/utils.js';
+import { chunkTranscript, updateProgress, getApiKey, saveApiKey, downloadReport, compactChineseBullets, assembleRawDraft } from './src/utils/utils.js';
 import { finalReportFormatter, quickFinalFormatter, formatForDisplay } from './src/agents/final-formatter.js';
 
 let currentReport = '';
@@ -49,6 +49,23 @@ async function uploadFileToGemini(file, apiKey) {
 async function deleteFileFromGemini(name, apiKey) {
     await deleteFile(name);
     return true;
+}
+
+// If final validation fails, request missing info from the agent
+async function handleValidationFailure(result, originalDraft, model) {
+    try {
+        const prompt = `You are a validation assistant.\n\nValidation result:\n${JSON.stringify(result, null, 2)}\n\n` +
+            `Original draft:\n${originalDraft}\n\n` +
+            `List the missing information and provide suggested replacement text in JSON format.`;
+        const parts = [{ text: prompt }];
+        const converted = convertContentParts(parts);
+        const text = await generateWithRetry(converted, 'Validation assistant', -1, model);
+        console.warn('Missing info:', text);
+        return text;
+    } catch (err) {
+        console.error('handleValidationFailure error:', err);
+        return null;
+    }
 }
 
 // Initialize Gemini AI
@@ -149,7 +166,7 @@ async function generateReport(e) {
         updateProgress(35, `已将访谈内容分成${chunks.length}个片段`, 
             chunks.map((c, i) => `片段${i+1}: ${c.substring(0, 50)}...`).join('<br>'));
         
-        let extractedChunks, organizedInfo, currentReport, architecturedInfo;
+        let extractedChunks, organizedInfo, currentReport, architecturedInfo, rawDraft;
         
         if (isSpeedMode) {
             // FAST MODE: Streamlined workflow for speed while maintaining accuracy
@@ -229,12 +246,13 @@ async function generateReport(e) {
                 displayExtractedInfo(extractedChunks, extractedInfoDiv);
             }
             
-            // Generate initial enhanced report
-            updateProgress(58, '📊 生成增强模式初始报告...');
+            // Assemble raw draft from all extracted information and file analyses
+            updateProgress(58, '📊 整合全部信息生成初稿...');
             const enhancedInfoSources = [combinedAnalyses].filter(Boolean).join('\n\n');
-            
+
             organizedInfo = await architectInformation(extractedChunks, enhancedInfoSources, allUploadedFiles, model);
-            currentReport = await masterComposeReport(organizedInfo, companyName, allUploadedFiles, model);
+            rawDraft = assembleRawDraft(extractedChunks, combinedAnalyses);
+            currentReport = await finalReportFormatter(rawDraft, model);
             
             // Display initial draft if visualization is enabled
             if (showProcessDetails) {
@@ -332,6 +350,7 @@ async function generateReport(e) {
                 const finalQualityResult = await finalQualityInspection(currentReport, transcript, combinedAnalyses, allUploadedFiles, model);
                 if (!finalQualityResult.pass) {
                     console.warn('⚠️ 最终质量检查未通过:', finalQualityResult.quality);
+                    await handleValidationFailure(finalQualityResult, rawDraft || currentReport, model);
                 }
                 updateProgress(98, `✅ 增强模式处理完成 - 最终质量: ${finalQualityResult.pass ? '通过' : '需改进'}`);
             } catch (error) {

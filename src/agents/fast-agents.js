@@ -38,7 +38,7 @@ ${extractPrompt.task}
 
 片段 ${index + 1}: ${chunk}
 
-${businessPlanContext ? `商业计划书关键信息（用于理解上下文）:\n${businessPlanContext.substring(0, 800)}...\n` : ''}
+${businessPlanContext ? `商业计划书关键信息（用于理解上下文）：\n${businessPlanContext}\n` : ''}
 
 重点提取：
 ${extractPrompt.extractionFocus.map(focus => `• ${focus}`).join('\n')}
@@ -57,7 +57,7 @@ ${extractPrompt.outputFormat}`;
 
 // Fast Agent 2: Quick Information Organization - Streamlined for Speed
 export async function fastOrganizeInformation(extractedChunks, businessPlan, model) {
-    const allInfo = extractedChunks.join('\n') + (businessPlan ? `\n${businessPlan.substring(0, 800)}` : '');
+    const allInfo = extractedChunks.join('\n') + (businessPlan ? `\n${businessPlan}` : '');
     
     try {
         const prompts = await loadFastPrompts();
@@ -196,10 +196,10 @@ ${qualityPrompt.task}
 ${report}
 
 原始访谈记录（用于完整性检查）：
-${transcript.substring(0, 1000)}...
+${transcript}
 
 商业计划书分析（用于一致性检查）：
-${businessPlanAnalysis ? businessPlanAnalysis.substring(0, 1000) : '无商业计划书数据'}...
+${businessPlanAnalysis ? businessPlanAnalysis : '无商业计划书数据'}
 
 评估标准：
 ${qualityPrompt.evaluationCriteria.map(criteria => `- ${criteria}`).join('\n')}
