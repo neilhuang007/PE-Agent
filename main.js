@@ -10,9 +10,8 @@ import {
     validateExcellence,
     intelligentEnrichment, 
     integrateEnhancements, 
-    excellenceFormatter, 
-    finalQualityInspection,
-    comprehensiveBPAnalysis 
+    excellenceFormatter,
+    comprehensiveBPAnalysis
 } from './src/agents/enhanced-agents.js';
 import { 
     fastExtractChunk, 
@@ -51,35 +50,26 @@ async function deleteFileFromGemini(name, apiKey) {
     return true;
 }
 
-// If final validation fails, request missing info from the agent
-async function handleValidationFailure(result, originalDraft, model) {
-    try {
-        // Load validation prompt from centralized configuration
-        let validationPrompt;
-        try {
-            const response = await fetch('./prompts/formatter-prompts.json');
-            const prompts = await response.json();
-            validationPrompt = prompts.validationAssistant;
-        } catch (error) {
-            console.warn('Failed to load validation prompt, using fallback');
-            validationPrompt = {
-                role: "You are a validation assistant.",
-                task: "List the missing information and provide suggested replacement text in JSON format."
-            };
+
+// Iteratively fill missing data with a safe loop limit
+async function fillMissingDataIteratively(report, transcript, combinedAnalyses, fileSummaries, fileUris, model, maxIterations = 2) {
+    let current = report;
+    for (let i = 0; i < maxIterations; i++) {
+        const validation = await crossValidateFacts(current, combinedAnalyses, fileSummaries, model);
+        const missing = validation.filter(f => !f.present);
+        if (missing.length === 0) break;
+
+        const enrichments = await intelligentEnrichment(current, transcript, combinedAnalyses, fileUris, model);
+        if (!enrichments || enrichments.length === 0) break;
+
+        const integrated = await integrateEnhancements(current, enrichments, transcript, combinedAnalyses, fileUris, model);
+        if (integrated && typeof integrated === 'string') {
+            current = integrated;
+        } else {
+            break;
         }
-        
-        const prompt = `${validationPrompt.role}\n\nValidation result:\n${JSON.stringify(result, null, 2)}\n\n` +
-            `Original draft:\n${originalDraft}\n\n` +
-            `${validationPrompt.task}`;
-        const parts = [{ text: prompt }];
-        const converted = convertContentParts(parts);
-        const text = await generateWithRetry(converted, validationPrompt.role, -1, model);
-        console.warn('Missing info:', text);
-        return text;
-    } catch (err) {
-        console.error('handleValidationFailure error:', err);
-        return null;
     }
+    return current;
 }
 
 // Initialize Gemini AI
@@ -311,6 +301,8 @@ async function generateReport(e) {
                 const missingFacts = factValidation.filter(r => !r.present);
                 if (missingFacts.length > 0) {
                     console.warn('⚠️ 报告遗漏信息:', missingFacts.map(m => m.fact));
+                    // Attempt to enrich and integrate missing data with a safe loop
+                    currentReport = await fillMissingDataIteratively(currentReport, transcript, combinedAnalyses, fileSummaries, allUploadedFiles, model);
                 }
 
                 // Excellence Validation with comprehensive data
@@ -358,19 +350,6 @@ async function generateReport(e) {
                 console.log('保持当前报告继续');
             }
             
-            // Final Quality Inspection with all sources
-            updateProgress(97, '🔍 最终质量检查...');
-            try {
-                const finalQualityResult = await finalQualityInspection(currentReport, transcript, combinedAnalyses, allUploadedFiles, model);
-                if (!finalQualityResult.pass) {
-                    console.warn('⚠️ 最终质量检查未通过:', finalQualityResult.quality);
-                    await handleValidationFailure(finalQualityResult, rawDraft || currentReport, model);
-                }
-                updateProgress(98, `✅ 增强模式处理完成 - 最终质量: ${finalQualityResult.pass ? '通过' : '需改进'}`);
-            } catch (error) {
-                console.error('最终质量检查出错:', error);
-                updateProgress(98, '✅ 增强模式处理完成');
-            }
         }
         
         // Safety check for currentReport
