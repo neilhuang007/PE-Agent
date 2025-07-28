@@ -43,6 +43,9 @@ export async function finalReportFormatter(report, model) {
     
     const prompt = `${promptConfig.role}\n\n${promptConfig.task}\n\n${formattingReqs}\n\n要求：\n${promptConfig.generalRequirements.map(req => `- ${req}`).join('\n')}\n\n报告内容：\n${report}\n\n${promptConfig.outputFormat}`;
 
+    // Log a preview of the prompt to confirm full content is sent
+    console.log('Formatter prompt preview:', prompt.substring(0, 200));
+
     try {
         const thinkingConfig = prompts.formatterThinking;
         

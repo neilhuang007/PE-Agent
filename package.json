@@ -16,7 +16,7 @@
     "typescript": "^5.8.3"
   },
   "scripts": {
-    "test": "tsc && node dist/utils/gemini-wrapper.test.js",
-    "test:gemini": "GEMINI_API_KEY=$GEMINI_API_KEY npm run test"
+    "test": "node test-gemini.js",
+    "test:gemini": "npm run test"
   }
 }
