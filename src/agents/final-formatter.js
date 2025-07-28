@@ -1,6 +1,23 @@
 // Final formatting agent to ensure enhanced reports are properly formatted and displayed
 import { generateWithRetry, convertContentParts } from '../utils/gemini-wrapper.js';
 
+// Load prompts from centralized JSON files
+let formatterPrompts = null;
+
+async function loadFormatterPrompts() {
+    if (!formatterPrompts) {
+        try {
+            const response = await fetch('./prompts/formatter-prompts.json');
+            formatterPrompts = await response.json();
+        } catch (error) {
+            console.error('Failed to load formatter prompts:', error);
+            // Fallback to empty object if loading fails
+            formatterPrompts = {};
+        }
+    }
+    return formatterPrompts;
+}
+
 /**
  * Final formatter agent that ensures the enhanced report is professionally formatted
  * and ready for display with optimal readability and structure
@@ -11,74 +28,30 @@ export async function finalReportFormatter(report, model) {
         return report;
     }
 
-    const prompt = `你是一位顶级的专业报告格式化专家，专门为私募股权机构制作最终的投资报告。
-
-请对以下报告进行最终的专业格式化，确保：
-
-1. **结构优化**：
-   - 清晰的多级标题体系（### #### 等）
-   - 逻辑清晰的段落结构
-   - 合理的信息层次
-
-2. **内容呈现**：
-   - 重要数据用**粗体**突出
-   - 关键发现用列表或要点形式
-   - 数字和百分比格式统一
-   - 专业术语准确使用
-
-3. **可读性优化**：
-   - 段落长度适中（避免过长段落）
-   - 适当的空行分隔
-   - 重要信息的视觉突出
-   - 流畅的阅读体验
-
-4. **专业标准**：
-   - 符合顶级PE机构报告规范
-   - 保持正式的商业语调
-   - 确保数据引用的准确性
-   - 维护逻辑的连贯性
-
-5. **最终检查**：
-   - 消除重复内容
-   - 修正格式不一致
-   - 确保完整性
-   - 优化整体表现
-
-要求：
-- 保持所有原始内容和数据的完整性
-- 不添加新的分析或观点
-- 专注于格式和呈现的优化
-- 确保报告适合直接呈现给投资委员会
-
-报告内容：
-${report}
-
-请输出最终格式化的专业报告：`;
+    const prompts = await loadFormatterPrompts();
+    const promptConfig = prompts.finalReportFormatter;
+    
+    if (!promptConfig) {
+        console.warn('Final formatter prompt not found, using fallback');
+        return report;
+    }
+    
+    const formattingReqs = Object.entries(promptConfig.formattingRequirements)
+        .map(([key, section], index) => 
+            `${index + 1}. **${section.title}**：\n   ${section.requirements.map(req => `- ${req}`).join('\n   ')}`
+        ).join('\n\n');
+    
+    const prompt = `${promptConfig.role}\n\n${promptConfig.task}\n\n${formattingReqs}\n\n要求：\n${promptConfig.generalRequirements.map(req => `- ${req}`).join('\n')}\n\n报告内容：\n${report}\n\n${promptConfig.outputFormat}`;
 
     try {
-        const thinkingPrompt = `## 最终格式化思考
-
-作为顶级的报告格式化专家，我需要：
-
-1. **结构分析**：
-   - 识别报告的主要章节
-   - 确定信息层次关系
-   - 优化标题和子标题
-
-2. **内容优化**：
-   - 突出关键数据和发现
-   - 统一数据呈现格式
-   - 改善段落结构
-
-3. **可读性提升**：
-   - 确保逻辑流畅
-   - 优化视觉呈现
-   - 提高专业性
-
-4. **质量保证**：
-   - 保持内容完整性
-   - 确保格式一致性
-   - 达到发布标准`;
+        const thinkingConfig = prompts.formatterThinking;
+        
+        const thinkingSteps = Object.entries(thinkingConfig.thinkingSteps)
+            .map(([key, step], index) => 
+                `${index + 1}. **${step.title}**：\n   ${step.tasks.map(task => `- ${task}`).join('\n   ')}`
+            ).join('\n\n');
+        
+        const thinkingPrompt = `## ${thinkingConfig.title}\n\n${thinkingConfig.role}\n\n${thinkingSteps}`;
 
         const parts = convertContentParts([{ text: prompt }]);
         const formattedReport = await generateWithRetry(parts, '顶级报告格式化专家', 32000);
@@ -106,23 +79,15 @@ export async function quickFinalFormatter(report, model) {
         return report;
     }
 
-    const prompt = `你是一位专业的报告格式化专家。请对以下PE访谈报告进行快速但专业的格式化。
-
-重点关注：
-1. 清晰的标题结构（### #### 等）
-2. 重要数据用**粗体**突出
-3. 适当的段落分隔
-4. 统一的格式标准
-
-保持：
-- 所有原始内容完整
-- 专业的商业语调
-- 逻辑的连贯性
-
-报告内容：
-${report}
-
-请输出格式化后的报告：`;
+    const prompts = await loadFormatterPrompts();
+    const promptConfig = prompts.quickFinalFormatter;
+    
+    if (!promptConfig) {
+        console.warn('Quick formatter prompt not found, using fallback');
+        return report;
+    }
+    
+    const prompt = `${promptConfig.role}\n\n重点关注：\n${promptConfig.focusAreas.map((area, i) => `${i + 1}. ${area}`).join('\n')}\n\n保持：\n${promptConfig.preserveRequirements.map(req => `- ${req}`).join('\n')}\n\n报告内容：\n${report}\n\n${promptConfig.outputFormat}`;
 
     try {
         const parts = convertContentParts([{ text: prompt }]);

@@ -12,14 +12,16 @@
   },
   "deepExtractChunk": {
     "role": "Agent that extracts information from interview segment",
-    "task": "task is to parse all information mentioned in this interview segment",
-    "focus": [
-      "ALL numbers and percentages",
-      "ALL names (people, companies, products)",
-      "ALL dates and timelines",
-      "Business plan data context"
+    "task": "Write a comprehensive summary of this interview segment using ONLY information explicitly mentioned.",
+    "requirements": [
+      "Source fidelity: Use only interview content - never add external information or context",
+      "Preserve all data: Capture every number, date, company name, and technical term exactly as stated",
+      "Complete coverage: Include all financial figures, services, competitive claims, and technical specifications",
+      "Objective tone: Filter out sales language while preserving factual claims and positioning statements",
+      "Clear organization: Use logical sections and bullet points for easy reference"
     ],
-    "outputFormat": "Include every data point found."
+    "critical": "If information conflicts with external knowledge, follow the interview. If details are unclear, note the ambiguity rather than clarifying from other sources.",
+    "outputFormat": "Comprehensive summary with all data points preserved"
   },
   "architectInformation": {
     "role": "AI agent who Organize data into sections. Keep ALL numbers, tables, percentages.",

@@ -54,12 +54,26 @@ async function deleteFileFromGemini(name, apiKey) {
 // If final validation fails, request missing info from the agent
 async function handleValidationFailure(result, originalDraft, model) {
     try {
-        const prompt = `You are a validation assistant.\n\nValidation result:\n${JSON.stringify(result, null, 2)}\n\n` +
+        // Load validation prompt from centralized configuration
+        let validationPrompt;
+        try {
+            const response = await fetch('./prompts/formatter-prompts.json');
+            const prompts = await response.json();
+            validationPrompt = prompts.validationAssistant;
+        } catch (error) {
+            console.warn('Failed to load validation prompt, using fallback');
+            validationPrompt = {
+                role: "You are a validation assistant.",
+                task: "List the missing information and provide suggested replacement text in JSON format."
+            };
+        }
+        
+        const prompt = `${validationPrompt.role}\n\nValidation result:\n${JSON.stringify(result, null, 2)}\n\n` +
             `Original draft:\n${originalDraft}\n\n` +
-            `List the missing information and provide suggested replacement text in JSON format.`;
+            `${validationPrompt.task}`;
         const parts = [{ text: prompt }];
         const converted = convertContentParts(parts);
-        const text = await generateWithRetry(converted, 'Validation assistant', -1, model);
+        const text = await generateWithRetry(converted, validationPrompt.role, -1, model);
         console.warn('Missing info:', text);
         return text;
     } catch (err) {

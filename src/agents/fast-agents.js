@@ -40,8 +40,10 @@ ${extractPrompt.task}
 
 ${businessPlanContext ? `商业计划书关键信息（用于理解上下文）：\n${businessPlanContext}\n` : ''}
 
-重点提取：
-${extractPrompt.extractionFocus.map(focus => `• ${focus}`).join('\n')}
+Requirements:
+${extractPrompt.requirements.map(req => `• ${req}`).join('\n')}
+
+Critical: ${extractPrompt.critical}
 
 ${extractPrompt.outputFormat}`;
 

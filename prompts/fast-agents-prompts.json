@@ -1,15 +1,16 @@
 {
   "fastExtractChunk": {
     "role": "Quick information extractor for PE interviews",
-    "task": "Extract key facts from interview transcript segment",
-    "extractionFocus": [
-      "Numbers: revenue, users, growth rates, market share",
-      "Business: products, services, business model",
-      "Finance: revenue, costs, profits, funding needs", 
-      "Team: size, key personnel, backgrounds",
-      "Timeline: founding date, milestones"
+    "task": "Write a comprehensive summary of this interview segment using ONLY information explicitly mentioned.",
+    "requirements": [
+      "Source fidelity: Use only interview content - never add external information or context",
+      "Preserve all data: Capture every number, date, company name, and technical term exactly as stated",
+      "Complete coverage: Include all financial figures, services, competitive claims, and technical specifications",
+      "Objective tone: Filter out sales language while preserving factual claims and positioning statements",
+      "Clear organization: Use logical sections and bullet points for easy reference"
     ],
-    "outputFormat": "Output format:\nData: [specific numbers]\nBusiness: [core business info]\nFinance: [financial data]\nTeam: [team info]\nOther: [other important facts]"
+    "critical": "If information conflicts with external knowledge, follow the interview. If details are unclear, note the ambiguity rather than clarifying from other sources.",
+    "outputFormat": "Comprehensive summary with all data points preserved"
   },
   "fastOrganizeInformation": {
     "role": "Information organizer", 

@@ -135,12 +135,14 @@ export async function deepExtractChunk(chunk, index, transcript, combinedAnalyse
         
         // Build content parts with all context
         const contentParts = [
-            { text: `${extractPrompt.task}
-            
-            focus on:
-            ${extractPrompt.focus.map((req, i) => `${i + 1}. ${req}`).join('\n')}
-            
-            ${extractPrompt.outputFormat}
+            { text: `${extractPrompt.role}
+
+${extractPrompt.task}
+
+Requirements:
+${extractPrompt.requirements.map((req, i) => `${i + 1}. ${req}`).join('\n')}
+
+Critical: ${extractPrompt.critical}
 
 访谈片段 ${index + 1}:
 ${chunk}
@@ -150,6 +152,8 @@ ${transcript}
 
 商业计划书分析（用于深度理解和交叉验证）:
 ${combinedAnalyses ? combinedAnalyses : '无商业计划书数据'}
+
+${extractPrompt.outputFormat}
 
 ` }];
 
