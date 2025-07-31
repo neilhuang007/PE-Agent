@@ -1260,6 +1260,27 @@ small {
     box-shadow: 0 2px 8px rgba(0, 123, 255, 0.1);
 }
 
+/* Stepper enhancement master page */
+.master-task-row {
+    display: flex;
+    justify-content: space-between;
+    padding: 8px 0;
+    border-bottom: 1px solid #444;
+    font-size: 0.9em;
+}
+
+.task-status-badge {
+    padding: 2px 8px;
+    border-radius: 12px;
+    font-weight: 600;
+    text-transform: uppercase;
+    font-size: 0.75em;
+}
+
+.task-status-badge.pending { background: #ffc107; color: #000; }
+.task-status-badge.processing { background: #17a2b8; color: #fff; }
+.task-status-badge.completed { background: #28a745; color: #fff; }
+
 .task-header {
     display: flex;
     justify-content: space-between;
