@@ -188,8 +188,18 @@ function updateStepDetailsContent() {
     
     let cardContent = '';
     let totalCards = Math.max(1, stepInfo.subCards.length);
-    
-    if (stepInfo.subCards.length > 0) {
+
+    if (currentStepId === 'step-enhancement' && stepInfo.subCards.length > 0 && typeof stepInfo.subCards[0] === 'object') {
+        totalCards = stepInfo.subCards.length + 1; // master page + each task
+        const index = currentCardIndex;
+
+        if (index === 0) {
+            cardContent = renderEnhancementMaster(stepInfo.subCards);
+        } else {
+            const taskObj = stepInfo.subCards[index - 1];
+            cardContent = renderEnhancementTask(taskObj, index, stepInfo.subCards.length);
+        }
+    } else if (stepInfo.subCards.length > 0) {
         const currentCard = stepInfo.subCards[currentCardIndex];
         cardContent = formatTaskContent(currentCard, currentCardIndex + 1);
     } else {
@@ -386,9 +396,38 @@ function formatSimpleTaskContent(cardData, cardIndex, isCompleted, isProcessing,
             
             ${isProcessing ? '<div class="processing-indicator"><div class="spinner"></div>正在处理中...</div>' : ''}
             
-            <div class="content-text" style="margin-top: 15px;">${description}</div>
+        <div class="content-text" style="margin-top: 15px;">${description}</div>
         </div>
     `;
+}
+
+function renderEnhancementMaster(tasks) {
+    let rows = tasks.map((t, i) => {
+        const statusMap = { pending: '待处理', processing: '处理中', completed: '已完成' };
+        return `<div class="master-task-row">
+            <span class="task-index">任务 ${i + 1}</span>
+            <span class="task-name">${t.task.research_task}</span>
+            <span class="task-status-badge ${t.status}">${statusMap[t.status] || t.status}</span>
+        </div>`;
+    }).join('');
+    return `<div class="step-card-content">
+        <h4>子任务进度</h4>
+        ${rows}
+    </div>`;
+}
+
+function renderEnhancementTask(taskObj, cardIndex, total) {
+    const statusMap = { pending: '待处理', processing: '处理中', completed: '已完成' };
+    let header = `子任务 ${cardIndex} - ${statusMap[taskObj.status] || taskObj.status}`;
+    if (taskObj.status === 'completed') {
+        const isChanged = taskObj.result.enhanced_content !== taskObj.result.original_quote;
+        const diff = taskObj.result.enhanced_content.length - taskObj.result.original_quote.length;
+        let card = `${isChanged ? '✅ 已增强' : '🔄 保持原样'} 子任务 ${cardIndex} 完成\n研究任务: ${taskObj.task.research_task}\n优先级: ${taskObj.task.priority}\n状态: 完成 (${diff >= 0 ? '+' : ''}${diff} 字符)\n\n📄 原始内容 (${taskObj.result.original_quote.length} 字符):\n${taskObj.result.original_quote}\n\n✨ 增强内容 (${taskObj.result.enhanced_content.length} 字符):\n${taskObj.result.enhanced_content}${taskObj.result.error ? '\n\n❌ 错误: ' + taskObj.result.error : ''}`;
+        return formatTaskContent(card, cardIndex);
+    } else {
+        let card = `🎯 任务 ${cardIndex}/${total} 开始\n研究任务: ${taskObj.task.research_task}\n优先级: ${taskObj.task.priority}\n状态: ${statusMap[taskObj.status]}`;
+        return formatTaskContent(card, cardIndex);
+    }
 }
 
 // Placeholder functions for file upload/delete until proper implementation
@@ -723,31 +762,37 @@ async function generateReport(e) {
             // Create visualization callback to capture subagent data for stepper
             const visualizationCallback = (type, data) => {
                 if (type === 'tasks') {
-                    // Store subagent tasks as sub-cards
                     if (data && data.enhancement_tasks) {
-                        data.enhancement_tasks.forEach((task, index) => {
-                            const taskData = `任务 ${index + 1}: ${task.research_task}\n优先级: ${task.priority}\n增强重点: ${task.enhancement_focus}\n期望改进: ${task.expected_improvement}\n\n原始片段:\n${task.original_quote}`;
-                            updateStepper('step-enhancement', 'active', '', taskData);
-                        });
+                        stepperData['step-enhancement'].subCards = data.enhancement_tasks.map(task => ({
+                            task,
+                            status: 'pending',
+                            result: null
+                        }));
                     }
-                    
-                    // Also display in old visualization if enabled
+
                     if (showProcessDetails) {
                         displaySubagentTasks(data, subagentTasksDiv);
+                    }
+                    if (currentStepId === 'step-enhancement') {
+                        currentCardIndex = 0;
+                        updateStepDetailsContent();
                     }
                 } else if (type === 'task_started') {
                     // Update unified display with processing status
                     if (data && data.index !== undefined && showProcessDetails) {
                         updateTaskProcessingStatus(data.index, 'processing');
                     }
-                    
-                    // Individual task started - create placeholder card
-                    const taskData = `🎯 任务 ${data.index + 1}/${data.total} 开始\n研究任务: ${data.task.research_task}\n优先级: ${data.task.priority}\n状态: 正在处理...\n\n原始片段:\n${data.task.original_quote}`;
-                    updateStepper('step-enhancement', 'active', '', taskData);
+
+                    if (stepperData['step-enhancement'].subCards[data.index]) {
+                        stepperData['step-enhancement'].subCards[data.index].status = 'processing';
+                    }
+                    if (currentStepId === 'step-enhancement') updateStepDetailsContent();
                 } else if (type === 'subtask_started') {
                     // Subtask started - update with processing status
-                    const subtaskData = `🔍 子任务 ${data.index + 1}/${data.total} 执行中\n研究任务: ${data.task.research_task}\n优先级: ${data.task.priority}\n状态: 正在分析和增强内容...\n\n目标片段:\n${data.task.original_quote}`;
-                    updateStepper('step-enhancement', 'active', '', subtaskData);
+                    if (stepperData['step-enhancement'].subCards[data.index]) {
+                        stepperData['step-enhancement'].subCards[data.index].status = 'processing';
+                    }
+                    if (currentStepId === 'step-enhancement') updateStepDetailsContent();
                 } else if (type === 'subtask_completed') {
                     // Update unified display with individual task completion
                     if (data && data.result && showProcessDetails) {
@@ -760,18 +805,23 @@ async function generateReport(e) {
                     const charDiff = data.result.enhanced_content.length - data.result.original_quote.length;
                     const diffText = charDiff > 0 ? `(+${charDiff} 字符)` : charDiff < 0 ? `(${charDiff} 字符)` : '(无变化)';
                     
-                    const completedData = `${changeIndicator} 子任务 ${data.index + 1}/${data.total} 完成\n研究任务: ${data.result.research_task}\n优先级: ${data.result.priority}\n状态: 完成 ${diffText}\n\n📄 原始内容 (${data.result.original_quote.length} 字符):\n${data.result.original_quote}\n\n✨ 增强内容 (${data.result.enhanced_content.length} 字符):\n${data.result.enhanced_content}${data.result.error ? '\n\n❌ 错误: ' + data.result.error : ''}`;
-                    
-                    updateStepper('step-enhancement', 'active', '', completedData);
+                    if (stepperData['step-enhancement'].subCards[data.index]) {
+                        stepperData['step-enhancement'].subCards[data.index].status = 'completed';
+                        stepperData['step-enhancement'].subCards[data.index].result = data.result;
+                    }
+                    if (currentStepId === 'step-enhancement') updateStepDetailsContent();
                 } else if (type === 'enhancements') {
-                    // Store enhancement results as additional sub-cards
                     if (data && Array.isArray(data)) {
                         data.forEach((result, index) => {
-                            const enhancementData = `增强结果 ${index + 1}:\n任务: ${result.research_task}\n优先级: ${result.priority}\n\n原始内容 (${result.original_quote.length} 字符):\n${result.original_quote}\n\n增强内容 (${result.enhanced_content.length} 字符):\n${result.enhanced_content}${result.error ? '\n\n错误: ' + result.error : ''}`;
-                            updateStepper('step-enhancement', 'active', '', enhancementData);
+                            if (stepperData['step-enhancement'].subCards[index]) {
+                                stepperData['step-enhancement'].subCards[index].status = 'completed';
+                                stepperData['step-enhancement'].subCards[index].result = result;
+                            }
                         });
                     }
-                    
+
+                    if (currentStepId === 'step-enhancement') updateStepDetailsContent();
+
                     // Also display in old visualization if enabled
                     if (showProcessDetails) {
                         displayEnhancementDetails(data, enhancementDetailsDiv);
