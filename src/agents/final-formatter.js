@@ -1,5 +1,6 @@
 // Final formatting agent to ensure enhanced reports are properly formatted and displayed
 import { generateWithRetry, convertContentParts } from '../utils/gemini-wrapper.js';
+import { marked } from 'https://cdn.jsdelivr.net/npm/marked@11.2.0/+esm';
 
 // Load prompts from centralized JSON files
 let formatterPrompts = null;
@@ -209,33 +210,10 @@ export function formatForDisplay(report) {
         return '<div class="error">无效的报告内容</div>';
     }
 
-    // Convert markdown-style formatting to HTML
-    let htmlReport = report
-        // Headers
-        .replace(/^### (.*$)/gm, '<h3>$1</h3>')
-        .replace(/^#### (.*$)/gm, '<h4>$1</h4>')
-        .replace(/^##### (.*$)/gm, '<h5>$1</h5>')
-        
-        // Bold text
-        .replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>')
-        
-        // Line breaks
-        .replace(/\n\n/g, '</p><p>')
-        .replace(/\n/g, '<br>')
-        
-        // Wrap in paragraphs
-        .replace(/^(.)/gm, '<p>$1')
-        .replace(/(.*)<\/p>/gm, '$1</p>')
-        
-        // Clean up empty paragraphs
-        .replace(/<p><\/p>/g, '')
-        .replace(/<p><br>/g, '<p>')
-        
-        // Handle lists
-        .replace(/^[•·-] (.*)$/gm, '<li>$1</li>')
-        .replace(/(<li>.*<\/li>)/s, '<ul>$1</ul>')
-        
-        // Numbers and percentages styling
+    // Use marked library for Markdown to HTML conversion
+    let htmlReport = marked.parse(report);
+    // Highlight numbers and percentages
+    htmlReport = htmlReport
         .replace(/(\d+(?:\.\d+)?%)/g, '<span class="number">$1</span>')
         .replace(/(\d+(?:,\d{3})*(?:\.\d+)?)/g, '<span class="number">$1</span>');
 
