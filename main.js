@@ -95,7 +95,7 @@ function updateStepper(stepId, status, data = '', subCardData = null) {
             step.classList.add('stepper-active');
             // Add processing spinner to status
             addSpinnerToTaskStatus(stepId, 'processing');
-            statusElement.textContent = '处理中';
+            statusElement.textContent = '';
             timeElement.textContent = `开始时间: ${now.toLocaleTimeString()}`;
             stepperData[stepId].startTime = now;
             break;
@@ -283,11 +283,11 @@ function updateTaskStatusWithSpinner(taskId, status) {
     switch(status) {
         case 'pending':
             addSpinnerToTaskStatus(`${taskId}-status`, 'waiting');
-            statusElement.textContent = '等待处理';
+            statusElement.textContent = '';
             break;
         case 'processing':
             addSpinnerToTaskStatus(`${taskId}-status`, 'processing');
-            statusElement.textContent = '处理中';
+            statusElement.textContent = '';
             break;
         case 'completed':
             addCheckToTaskStatus(`${taskId}-status`);
@@ -535,7 +535,7 @@ function formatSimpleTaskContent(cardData, cardIndex, isCompleted, isProcessing,
                 </div>` : ''}
             </div>` : ''}
             
-            ${isProcessing ? '<div class="processing-indicator"><div class="spinner"></div>正在处理中...</div>' : ''}
+            ${isProcessing ? '<div class="processing-indicator"><div class="spinner"></div></div>' : ''}
 
         <div class="content-text" style="margin-top: 15px;">${marked.parse(description)}</div>
         </div>
@@ -1437,9 +1437,7 @@ function displaySubagentTasks(tasks, container) {
             <div class="unified-task-item" id="${taskId}">
                 <div class="task-header">
                     <h4>任务 ${index + 1}: ${task.research_task}</h4>
-                    <span class="task-status pending" id="${taskId}-status">
-                        <span class="status-icon"></span>等待处理
-                    </span>
+                    <span class="task-status pending" id="${taskId}-status"></span>
                 </div>
                 
                 <div class="task-details">
@@ -1447,7 +1445,7 @@ function displaySubagentTasks(tasks, container) {
                         <span class="priority-badge ${task.priority}">${task.priority.toUpperCase()}</span>
                         <span class="agent-role">🤖 专业数据分析师</span>
                         <span class="task-progress" id="${taskId}-progress" style="display: none;">
-                            <div class="spinner-small spinner-processing"></div>处理中...
+                            <div class="spinner-small spinner-processing"></div>
                         </span>
                     </div>
                     
