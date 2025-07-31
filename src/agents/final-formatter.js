@@ -38,8 +38,8 @@ export async function finalReportFormatter(report, model) {
     
     const prompt = `${promptConfig.userPrompt}\n\nReport content to format:\n${report}`;
 
-    // Log a preview of the prompt to confirm full content is sent
-    console.log('Formatter prompt preview:', prompt.substring(0, 200));
+    // Log the full prompt to confirm all content is sent
+    console.log('Formatter prompt (full):', prompt);
 
     try {
         const parts = convertContentParts([{ text: prompt }]);

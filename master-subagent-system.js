@@ -285,7 +285,7 @@ export async function replaceQuotesWithEnhancements(report, enhancementResults) 
                     }
                 } else {
                     console.log(`⚠️ Quote not found for task: ${result.research_task}`);
-                    console.log(`   Looking for: "${result.original_quote.substring(0, 50)}..."`);
+                    console.log(`   Looking for: "${result.original_quote}"`);
                 }
             }
         }
@@ -319,7 +319,7 @@ export async function orchestrateMasterSubAgentSystem(report, transcript, fileUr
     console.log('Enhancement tasks:');
     enhancementTasks.enhancement_tasks.forEach((task, i) => {
         console.log(`${i + 1}. [${task.priority.toUpperCase()}] ${task.research_task}`);
-        console.log(`   Quote: "${task.original_quote.substring(0, 100)}..."`);
+        console.log(`   Quote: "${task.original_quote}"`);
         console.log(`   Focus: ${task.enhancement_focus}`);
     });
     console.log('=== END MASTER ANALYSIS ===\n');
@@ -327,6 +327,15 @@ export async function orchestrateMasterSubAgentSystem(report, transcript, fileUr
     // Send tasks to visualization callback if provided
     if (visualizationCallback) {
         visualizationCallback('tasks', enhancementTasks);
+        
+        // Send individual task notifications as they start
+        enhancementTasks.enhancement_tasks.forEach((task, index) => {
+            visualizationCallback('task_started', {
+                task,
+                index,
+                total: enhancementTasks.enhancement_tasks.length
+            });
+        });
     }
 
     // Step 2: Filter high-priority tasks
@@ -341,18 +350,39 @@ export async function orchestrateMasterSubAgentSystem(report, transcript, fileUr
 
     console.log(`🔬 执行 ${highPriorityTasks.length} 个高优先级子代理任务...`);
 
-    // Step 3: Execute sub-agents in parallel
-    const subAgentPromises = highPriorityTasks.map(task =>
-        executeSubAgentTask(task, report, transcript, fileUris, model)
-    );
+    // Step 3: Execute sub-agents in parallel with immediate result notifications
+    const subAgentPromises = highPriorityTasks.map(async (task, index) => {
+        // Notify that this specific subtask is starting
+        if (visualizationCallback) {
+            visualizationCallback('subtask_started', {
+                task,
+                index,
+                total: highPriorityTasks.length
+            });
+        }
+        
+        const result = await executeSubAgentTask(task, report, transcript, fileUris, model);
+        
+        // Notify immediately when this subtask completes with the substitution result
+        if (visualizationCallback) {
+            visualizationCallback('subtask_completed', {
+                task,
+                result,
+                index,
+                total: highPriorityTasks.length
+            });
+        }
+        
+        return result;
+    });
 
     const enhancementResults = await Promise.all(subAgentPromises);
 
     console.log('=== SUB-AGENT RESULTS ===');
     enhancementResults.forEach(result => {
         console.log(`\n--- Task: ${result.research_task} ---`);
-        console.log(`Original (${result.original_quote.length} chars): "${result.original_quote.substring(0, 100)}..."`);
-        console.log(`Enhanced (${result.enhanced_content.length} chars): "${result.enhanced_content.substring(0, 100)}..."`);
+        console.log(`Original (${result.original_quote.length} chars): "${result.original_quote}"`);
+        console.log(`Enhanced (${result.enhanced_content.length} chars): "${result.enhanced_content}"`);
         const improvement = result.enhanced_content.length - result.original_quote.length;
         console.log(`Improvement: ${improvement > 0 ? '+' : ''}${improvement} characters`);
         if (result.error) {

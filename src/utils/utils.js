@@ -74,19 +74,6 @@ export function downloadReport(report) {
     window.URL.revokeObjectURL(url);
 }
 
-// Compact text to Chinese bullet points and limit length
-export function compactChineseBullets(text, maxChars = 10000) {
-    if (!text) return '';
-    const chineseOnly = text
-        .replace(/[^\u4e00-\u9fa50-9。，、；：！？%\-\n]/g, '')
-        .split(/\n+/)
-        .map(line => line.trim())
-        .filter(Boolean)
-        .map(line => `• ${line}`)
-        .join('\n');
-    return chineseOnly.slice(0, maxChars);
-}
-
 // Build a raw draft from extracted information and file analyses
 export function assembleRawDraft(extractedChunks, fileAnalyses = '') {
     const parts = [];

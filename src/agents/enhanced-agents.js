@@ -2,7 +2,6 @@
 // This file contains the complete enhanced agent architecture for generating
 // world-class private equity interview reports using Gemini Pro's thinking capabilities
 
-import { compactChineseBullets } from '../utils/utils.js';
 import { initGeminiClient, generateWithRetry, convertContentParts } from '../utils/gemini-wrapper.js';
 
 // Load prompts from centralized JSON files
@@ -128,7 +127,7 @@ export async function deepExtractChunk(chunk, index, transcript, combinedAnalyse
         
         if (!extractPrompt) {
             console.warn('Deep extract prompt not found, using fallback');
-            return `片段 ${index + 1}: ${chunk.substring(0, 500)}...`;
+            return `片段 ${index + 1}: ${chunk}`;
         }
         
         // Build content parts with all context

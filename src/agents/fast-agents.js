@@ -35,7 +35,7 @@ async function loadFormatterPrompts() {
 
 // Fast Agent 1: Quick Information Extraction - Uses enhanced prompts with thinking budget 0
 export async function fastExtractChunk(chunk, index, businessPlanContext, model) {
-    console.log(`FastExtractChunk ${index + 1} input:`, chunk.substring(0, 100) + '...'); // Debug log
+    console.log(`FastExtractChunk ${index + 1} input:`, chunk); // Debug log
     
     try {
         const prompts = await loadEnhancedPrompts();
@@ -43,7 +43,7 @@ export async function fastExtractChunk(chunk, index, businessPlanContext, model)
         
         if (!extractPrompt) {
             console.warn('Extract prompt not found, using fallback');
-            return `片段 ${index + 1}: ${chunk.substring(0, 500)}...`;
+            return `片段 ${index + 1}: ${chunk}`;
         }
         
         const prompt = `${extractPrompt.role}
@@ -65,7 +65,7 @@ ${extractPrompt.outputFormat}`;
 
         const promptParts = convertContentParts([{ text: prompt }]);
         const extractedText = await generateWithRetry(promptParts, extractPrompt.role, 0); // Use thinking budget 0 for fast mode
-        console.log(`FastExtractChunk ${index + 1} result:`, extractedText.substring(0, 150) + '...'); // Debug log
+        console.log(`FastExtractChunk ${index + 1} result:`, extractedText); // Debug log
         return extractedText;
     } catch (error) {
         console.error(`Error in fastExtractChunk ${index}:`, error);
@@ -118,23 +118,23 @@ ${rawData}
 
 请直接输出完整格式化的报告。`;
 
-        console.log('FastComposeReport prompt:', prompt.substring(0, 500) + '...'); // Debug log
+        console.log('FastComposeReport prompt:', prompt); // Debug log
 
         const composeParts = convertContentParts([{ text: prompt }]);
         const reportText = await generateWithRetry(composeParts, 'PE投资分析师', 0); // Use thinking budget 0 for fast mode
         
-        console.log('FastComposeReport raw result:', reportText.substring(0, 200) + '...'); // Debug log
+        console.log('FastComposeReport raw result:', reportText); // Debug log
         
         // Safety check for valid report
         if (!reportText || typeof reportText !== 'string' || reportText.trim().length < 50) {
             console.error('生成的报告过短或无效，长度:', reportText?.length);
-            return `【报告生成错误】\n无法生成有效报告内容。\n\n基于提供的信息：\n${rawData.substring(0, 500)}...`;
+            return `【报告生成错误】\n无法生成有效报告内容。\n\n基于提供的信息：\n${rawData}`;
         }
         
         return reportText;
     } catch (error) {
         console.error('Error in fastComposeReport:', error);
-        return `【报告生成失败】\n错误信息: ${error.message}\n\n输入信息:\n公司：${companyName}\n原始数据: ${rawData.substring(0, 200)}...`;
+        return `【报告生成失败】\n错误信息: ${error.message}\n\n输入信息:\n公司：${companyName}\n原始数据: ${rawData}`;
     }
 }
 
