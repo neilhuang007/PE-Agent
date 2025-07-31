@@ -147,6 +147,10 @@ button:disabled {
     text-align: center;
     margin-top: 10px;
     color: #ddd;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
 }
 
 .validation-status {
@@ -1446,3 +1450,729 @@ small {
     background: rgba(220, 53, 69, 0.2) !important;
     color: #dc3545 !important;
 }
+
+/* Spinner div element for processing text */
+.spinner {
+    display: inline-block;
+    width: 16px;
+    height: 16px;
+    border: 2px solid rgba(255, 152, 0, 0.3);
+    border-top: 2px solid #FF9800;
+    border-radius: 50%;
+    animation: spin 1s linear infinite;
+    margin-right: 8px;
+    vertical-align: middle;
+}
+
+@keyframes spin {
+    0% { transform: rotate(0deg); }
+    100% { transform: rotate(360deg); }
+}
+
+/* Enhanced Loading Animations for Master-SubAgent System in Modal */
+.subagent-loading-container-modal {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    padding: 25px;
+    background: linear-gradient(135deg, #1e1e1e 0%, #2a2a2a 100%);
+    border-radius: 12px;
+    margin: 20px 0;
+    border: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.subagent-loading-title {
+    color: #fff;
+    font-size: 1.4em;
+    margin-bottom: 20px;
+    text-align: center;
+}
+
+.subagent-loading-animation {
+    position: relative;
+    width: 120px;
+    height: 120px;
+    margin: 20px 0;
+}
+
+.master-agent-circle {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    width: 60px;
+    height: 60px;
+    background: linear-gradient(135deg, #FF9800 0%, #e68900 100%);
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: white;
+    font-weight: bold;
+    font-size: 14px;
+    box-shadow: 0 4px 15px rgba(255, 152, 0, 0.4);
+    z-index: 2;
+}
+
+.subagent-orbit {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    border: 2px solid rgba(255, 152, 0, 0.2);
+    border-radius: 50%;
+    animation: orbit-rotate 4s linear infinite;
+}
+
+.subagent-orbit.orbit-1 {
+    width: 100px;
+    height: 100px;
+    animation-duration: 3s;
+}
+
+.subagent-orbit.orbit-2 {
+    width: 120px;
+    height: 120px;
+    animation-duration: 4s;
+    animation-direction: reverse;
+}
+
+.subagent-dot {
+    position: absolute;
+    width: 12px;
+    height: 12px;
+    background: linear-gradient(135deg, #4CAF50 0%, #45a049 100%);
+    border-radius: 50%;
+    box-shadow: 0 2px 8px rgba(76, 175, 80, 0.4);
+}
+
+.subagent-dot.dot-1 {
+    top: -6px;
+    left: 50%;
+    transform: translateX(-50%);
+    animation: pulse-green 2s ease-in-out infinite;
+}
+
+.subagent-dot.dot-2 {
+    bottom: -6px;
+    right: 50%;
+    transform: translateX(50%);
+    animation: pulse-green 2s ease-in-out infinite 0.5s;
+}
+
+.subagent-dot.dot-3 {
+    top: 50%;
+    right: -6px;
+    transform: translateY(-50%);
+    animation: pulse-green 2s ease-in-out infinite 1s;
+}
+
+.subagent-dot.dot-4 {
+    top: 50%;
+    left: -6px;
+    transform: translateY(-50%);
+    animation: pulse-green 2s ease-in-out infinite 1.5s;
+}
+
+/* Multi-orbit system for subagents */
+.subagent-orbits-container {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    width: 240px;
+    height: 240px;
+}
+
+.subagent-orbits-container::before,
+.subagent-orbits-container::after {
+    content: '';
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    border: 1px solid rgba(255, 152, 0, 0.15);
+    border-radius: 50%;
+    transform: translate(-50%, -50%);
+}
+
+.subagent-orbits-container::before {
+    width: 160px;
+    height: 160px;
+}
+
+.subagent-orbits-container::after {
+    width: 200px;
+    height: 200px;
+}
+
+.subagent-dot.dynamic-dot {
+    position: absolute;
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    top: 50%;
+    left: 50%;
+    animation: pulse-subagent 2s ease-in-out infinite, orbit-rotation 6s linear infinite;
+    animation-delay: var(--delay, 0s);
+    transform-origin: 0 0;
+}
+
+/* Different orbit sizes and colors */
+.subagent-dot.orbit-1 {
+    background: linear-gradient(135deg, #4CAF50 0%, #45a049 100%);
+    box-shadow: 0 2px 6px rgba(76, 175, 80, 0.4);
+    transform: translate(-50%, -50%) rotate(var(--angle, 0deg)) translateY(-40px);
+}
+
+.subagent-dot.orbit-2 {
+    background: linear-gradient(135deg, #2196F3 0%, #1976D2 100%);
+    box-shadow: 0 2px 6px rgba(33, 150, 243, 0.4);
+    transform: translate(-50%, -50%) rotate(var(--angle, 0deg)) translateY(-50px);
+}
+
+.subagent-dot.orbit-3 {
+    background: linear-gradient(135deg, #FF9800 0%, #F57C00 100%);
+    box-shadow: 0 2px 6px rgba(255, 152, 0, 0.4);
+    transform: translate(-50%, -50%) rotate(var(--angle, 0deg)) translateY(-60px);
+}
+
+/* Status-based coloring */
+.subagent-dot.completed {
+    background: linear-gradient(135deg, #4CAF50 0%, #45a049 100%) !important;
+    box-shadow: 0 0 12px rgba(76, 175, 80, 0.6) !important;
+}
+
+.subagent-dot.processing {
+    background: linear-gradient(135deg, #FF9800 0%, #F57C00 100%) !important;
+    box-shadow: 0 0 12px rgba(255, 152, 0, 0.6) !important;
+    animation: pulse-subagent 1s ease-in-out infinite, orbit-rotation 6s linear infinite !important;
+}
+
+.subagent-dot.pending {
+    background: linear-gradient(135deg, #9E9E9E 0%, #757575 100%) !important;
+    box-shadow: 0 2px 6px rgba(158, 158, 158, 0.4) !important;
+}
+
+@keyframes pulse-subagent {
+    0%, 100% {
+        transform: translate(-50%, -50%) rotate(var(--angle, 0deg)) translateY(var(--orbit-radius, -50px)) scale(1);
+        opacity: 0.8;
+    }
+    50% {
+        transform: translate(-50%, -50%) rotate(var(--angle, 0deg)) translateY(var(--orbit-radius, -50px)) scale(1.2);
+        opacity: 1;
+    }
+}
+
+@keyframes orbit-rotation {
+    from {
+        transform: translate(-50%, -50%) rotate(var(--angle, 0deg)) translateY(var(--orbit-radius, -50px)) rotate(0deg);
+    }
+    to {
+        transform: translate(-50%, -50%) rotate(var(--angle, 0deg)) translateY(var(--orbit-radius, -50px)) rotate(360deg);
+    }
+}
+
+@keyframes orbit-rotate {
+    from {
+        transform: translate(-50%, -50%) rotate(0deg);
+    }
+    to {
+        transform: translate(-50%, -50%) rotate(360deg);
+    }
+}
+
+@keyframes pulse-green {
+    0%, 100% {
+        transform: scale(1);
+        opacity: 0.7;
+    }
+    50% {
+        transform: scale(1.3);
+        opacity: 1;
+        box-shadow: 0 0 20px rgba(76, 175, 80, 0.8);
+    }
+}
+
+.subagent-status-text {
+    color: #ddd;
+    text-align: center;
+    margin-top: 15px;
+    font-size: 1.1em;
+    min-height: 60px;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+}
+
+.subagent-progress-bar {
+    width: 200px;
+    height: 6px;
+    background: rgba(255, 255, 255, 0.1);
+    border-radius: 3px;
+    overflow: hidden;
+    margin: 15px 0;
+}
+
+.subagent-progress-fill {
+    height: 100%;
+    background: linear-gradient(90deg, #FF9800 0%, #4CAF50 100%);
+    border-radius: 3px;
+    transition: width 0.3s ease;
+    width: 0%;
+}
+
+.subagent-task-counter {
+    color: #FF9800;
+    font-weight: bold;
+    font-size: 1.2em;
+    margin-top: 10px;
+}
+
+/* Enhanced Task Card Animations */
+.unified-task-item {
+    background: linear-gradient(135deg, #2a2d35 0%, #23252b 100%);
+    border: 1px solid #444;
+    border-radius: 12px;
+    margin: 15px 0;
+    padding: 20px;
+    transition: all 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+    transform: translateY(0);
+    opacity: 1;
+}
+
+.unified-task-item:hover {
+    border-color: #FF9800;
+    box-shadow: 0 8px 25px rgba(255, 152, 0, 0.15);
+    transform: translateY(-3px);
+}
+
+.unified-task-item.task-processing {
+    border-color: #17a2b8;
+    background: linear-gradient(135deg, #2a2d35 0%, #1e2b30 100%);
+    animation: task-processing-glow 2s ease-in-out infinite;
+}
+
+.unified-task-item.task-completed {
+    border-color: #28a745;
+    background: linear-gradient(135deg, #2a2d35 0%, #1e2b1e 100%);
+    animation: task-completion-flash 0.6s ease-out;
+}
+
+@keyframes task-processing-glow {
+    0%, 100% {
+        box-shadow: 0 4px 15px rgba(23, 162, 184, 0.1);
+    }
+    50% {
+        box-shadow: 0 4px 25px rgba(23, 162, 184, 0.3);
+    }
+}
+
+@keyframes task-completion-flash {
+    0% {
+        background: linear-gradient(135deg, #28a745 0%, #20c997 100%);
+        transform: scale(1.02);
+    }
+    100% {
+        background: linear-gradient(135deg, #2a2d35 0%, #1e2b1e 100%);
+        transform: scale(1);
+    }
+}
+
+/* Enhanced Task Status Badges */
+.task-status {
+    padding: 6px 14px;
+    border-radius: 20px;
+    font-size: 0.85em;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    transition: all 0.3s ease;
+}
+
+.task-status.processing {
+    background: linear-gradient(135deg, #17a2b8 0%, #20c997 100%);
+    color: #fff;
+    animation: status-pulse 2s infinite;
+}
+
+.task-status.processing::before {
+    content: '';
+    width: 8px;
+    height: 8px;
+    background: rgba(255, 255, 255, 0.8);
+    border-radius: 50%;
+    animation: processing-dot 1.5s ease-in-out infinite;
+}
+
+@keyframes status-pulse {
+    0%, 100% {
+        box-shadow: 0 0 0 0 rgba(23, 162, 184, 0.7);
+    }
+    50% {
+        box-shadow: 0 0 0 8px rgba(23, 162, 184, 0);
+    }
+}
+
+@keyframes processing-dot {
+    0%, 80%, 100% {
+        transform: scale(0.8);
+        opacity: 0.5;
+    }
+    40% {
+        transform: scale(1.2);
+        opacity: 1;
+    }
+}
+
+/* Enhanced Priority Badges */
+.priority-badge {
+    padding: 4px 10px;
+    border-radius: 12px;
+    font-size: 0.75em;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    position: relative;
+    overflow: hidden;
+}
+
+.priority-badge.high {
+    background: linear-gradient(135deg, #dc3545 0%, #c82333 100%);
+    color: #fff;
+    animation: priority-high-pulse 3s ease-in-out infinite;
+}
+
+.priority-badge.medium {
+    background: linear-gradient(135deg, #ffc107 0%, #e0a800 100%);
+    color: #000;
+}
+
+.priority-badge.low {
+    background: linear-gradient(135deg, #6c757d 0%, #5a6268 100%);
+    color: #fff;
+}
+
+@keyframes priority-high-pulse {
+    0%, 100% {
+        box-shadow: 0 0 0 0 rgba(220, 53, 69, 0.4);
+    }
+    50% {
+        box-shadow: 0 0 0 4px rgba(220, 53, 69, 0);
+    }
+}
+
+/* Enhanced Content Sections */
+.enhanced-content {
+    background: linear-gradient(135deg, rgba(76, 175, 80, 0.1) 0%, rgba(76, 175, 80, 0.05) 100%);
+    border: 1px solid rgba(76, 175, 80, 0.3);
+    border-radius: 8px;
+    overflow: hidden;
+    margin-top: 15px;
+    animation: content-reveal 0.5s ease-out;
+}
+
+@keyframes content-reveal {
+    from {
+        opacity: 0;
+        max-height: 0;
+        transform: translateY(-10px);
+    }
+    to {
+        opacity: 1;
+        max-height: 500px;
+        transform: translateY(0);
+    }
+}
+
+.content-text {
+    font-family: 'Monaco', 'Menlo', 'Ubuntu Mono', monospace;
+    font-size: 0.9em;
+    line-height: 1.5;
+    white-space: pre-wrap;
+    color: #e8e8e8;
+    background: rgba(0, 0, 0, 0.2);
+    padding: 15px;
+    border-radius: 6px;
+    max-height: 200px;
+    overflow-y: auto;
+    word-break: break-word;
+    position: relative;
+}
+
+/* Remove unused floating indicator styles since we moved to modal */
+
+/* Enhanced Stepper Loading States */
+.stepper-active .stepper-circle {
+    background: linear-gradient(135deg, #FF9800 0%, #e68900 100%);
+    color: white;
+    animation: stepper-active-pulse 2s ease-in-out infinite;
+    position: relative;
+    overflow: hidden;
+}
+
+.stepper-active .stepper-circle::after {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: -100%;
+    width: 100%;
+    height: 100%;
+    background: linear-gradient(90deg, transparent 0%, rgba(255, 255, 255, 0.4) 50%, transparent 100%);
+    animation: stepper-shine 2s linear infinite;
+}
+
+@keyframes stepper-active-pulse {
+    0%, 100% {
+        box-shadow: 0 0 0 0 rgba(255, 152, 0, 0.7);
+    }
+    50% {
+        box-shadow: 0 0 0 8px rgba(255, 152, 0, 0);
+    }
+}
+
+@keyframes stepper-shine {
+    0% {
+        left: -100%;
+    }
+    100% {
+        left: 100%;
+    }
+}
+
+/* Enhanced Task Display Elements */
+.description-grid {
+    display: grid;
+    gap: 12px;
+    margin: 15px 0;
+}
+
+.description-item {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    padding: 10px;
+    background: rgba(255, 255, 255, 0.03);
+    border-radius: 6px;
+    border-left: 3px solid rgba(255, 152, 0, 0.3);
+}
+
+.description-item strong {
+    color: #FF9800;
+    font-size: 0.9em;
+    font-weight: 600;
+}
+
+.description-value {
+    color: #ddd;
+    font-size: 0.9em;
+    line-height: 1.4;
+}
+
+.content-length {
+    font-size: 0.8em;
+    color: #aaa;
+    font-weight: normal;
+    margin-left: 8px;
+}
+
+.task-progress {
+    display: none;
+    align-items: center;
+    gap: 8px;
+}
+
+.progress-dots {
+    display: flex;
+    gap: 4px;
+}
+
+.progress-dots .dot {
+    width: 6px;
+    height: 6px;
+    background: #17a2b8;
+    border-radius: 50%;
+    animation: progress-dot-bounce 1.4s ease-in-out infinite both;
+}
+
+.progress-dots .dot:nth-child(1) { animation-delay: -0.32s; }
+.progress-dots .dot:nth-child(2) { animation-delay: -0.16s; }
+.progress-dots .dot:nth-child(3) { animation-delay: 0s; }
+
+@keyframes progress-dot-bounce {
+    0%, 80%, 100% {
+        transform: scale(0.8);
+        opacity: 0.5;
+    }
+    40% {
+        transform: scale(1.2);
+        opacity: 1;
+    }
+}
+
+/* Enhanced Stats Display */
+.stats-row {
+    display: flex;
+    gap: 12px;
+    flex-wrap: wrap;
+    margin-top: 15px;
+}
+
+.stat-item {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    background: rgba(0, 0, 0, 0.3);
+    padding: 8px 12px;
+    border-radius: 20px;
+    font-size: 0.85em;
+    transition: all 0.3s ease;
+}
+
+.stat-item:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
+}
+
+.stat-label {
+    font-weight: 500;
+    color: #bbb;
+}
+
+.stat-value {
+    font-weight: 600;
+    color: #fff;
+}
+
+.stat-icon {
+    font-size: 1.1em;
+}
+
+.stat-item.improvement-positive {
+    background: linear-gradient(135deg, rgba(76, 175, 80, 0.2) 0%, rgba(76, 175, 80, 0.1) 100%);
+    border: 1px solid rgba(76, 175, 80, 0.3);
+    color: #4CAF50;
+}
+
+.stat-item.improvement-negative {
+    background: linear-gradient(135deg, rgba(244, 67, 54, 0.2) 0%, rgba(244, 67, 54, 0.1) 100%);
+    border: 1px solid rgba(244, 67, 54, 0.3);
+    color: #f44336;
+}
+
+.stat-item.improvement-neutral {
+    background: linear-gradient(135deg, rgba(158, 158, 158, 0.2) 0%, rgba(158, 158, 158, 0.1) 100%);
+    border: 1px solid rgba(158, 158, 158, 0.3);
+    color: #9e9e9e;
+}
+
+.stat-item.error {
+    background: linear-gradient(135deg, rgba(244, 67, 54, 0.2) 0%, rgba(244, 67, 54, 0.1) 100%);
+    border: 1px solid rgba(244, 67, 54, 0.5);
+    color: #f44336;
+}
+
+/* Status Icon Enhancements */
+.status-icon {
+    display: inline-block;
+    margin-right: 6px;
+    font-size: 1.1em;
+}
+
+.task-status.processing .status-icon {
+    animation: status-icon-spin 2s linear infinite;
+}
+
+@keyframes status-icon-spin {
+    from {
+        transform: rotate(0deg);
+    }
+    to {
+        transform: rotate(360deg);
+    }
+}
+
+.task-status.completed .status-icon {
+    animation: status-icon-bounce 0.6s ease-out;
+}
+
+@keyframes status-icon-bounce {
+    0%, 100% {
+        transform: scale(1);
+    }
+    50% {
+        transform: scale(1.2);
+    }
+}
+
+/* Dynamic spinner styles with color coding */
+.spinner {
+    display: inline-block;
+    width: 16px;
+    height: 16px;
+    border: 2px solid rgba(255, 255, 255, 0.3);
+    border-top: 2px solid #fff;
+    border-radius: 50%;
+    animation: spin 1s linear infinite;
+    margin-right: 8px;
+}
+
+.spinner-small {
+    display: inline-block;
+    width: 12px;
+    height: 12px;
+    border: 2px solid rgba(255, 255, 255, 0.3);
+    border-top: 2px solid #fff;
+    border-radius: 50%;
+    animation: spin 1s linear infinite;
+}
+
+/* Color-coded spinners for different states */
+.spinner-waiting {
+    border: 2px solid rgba(255, 255, 255, 0.3);
+    border-top: 2px solid #fff;
+}
+
+.spinner-processing {
+    border: 2px solid rgba(255, 193, 7, 0.3);
+    border-top: 2px solid #FFC107;
+}
+
+.spinner-small.spinner-waiting {
+    border: 2px solid rgba(255, 255, 255, 0.3);
+    border-top: 2px solid #fff;
+}
+
+.spinner-small.spinner-processing {
+    border: 2px solid rgba(255, 193, 7, 0.3);
+    border-top: 2px solid #FFC107;
+}
+
+/* Check icon styles for replacing emojis */
+.check-icon {
+    display: inline-block;
+    width: 16px;
+    height: 16px;
+    color: #4CAF50;
+    margin-right: 4px;
+}
+
+/* Replace '处理中' text with spinner */
+.progress-text {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+}
+
+/* Stepper status text with spinners */
+.stepper-status {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+}
+
+/* Dynamic spinners and checks are now handled by JavaScript - no static CSS rules needed */

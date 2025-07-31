@@ -28,7 +28,7 @@ async function retryWithBackoff(apiCall, maxRetries = MAX_RETRIES) {
                 (error.message && error.message.includes('503'))) {
 
                 const delay = INITIAL_DELAY * Math.pow(BACKOFF_MULTIPLIER, attempt);
-                console.log(`⚠️ Model overloaded (attempt ${attempt + 1}/${maxRetries}). Retrying in ${delay}ms...`);
+                console.log(`Model overloaded (attempt ${attempt + 1}/${maxRetries}). Retrying in ${delay}ms...`);
                 await sleep(delay);
                 continue;
             }
@@ -39,7 +39,7 @@ async function retryWithBackoff(apiCall, maxRetries = MAX_RETRIES) {
                 (error.message && error.message.includes('rate limit'))) {
 
                 const delay = INITIAL_DELAY * Math.pow(BACKOFF_MULTIPLIER, attempt) * 2; // Longer delay for rate limits
-                console.log(`⚠️ Rate limit hit (attempt ${attempt + 1}/${maxRetries}). Retrying in ${delay}ms...`);
+                console.log(`Rate limit hit (attempt ${attempt + 1}/${maxRetries}). Retrying in ${delay}ms...`);
                 await sleep(delay);
                 continue;
             }
@@ -50,7 +50,7 @@ async function retryWithBackoff(apiCall, maxRetries = MAX_RETRIES) {
     }
 
     // If all retries failed, throw the last error
-    console.error(`❌ All ${maxRetries} retry attempts failed`);
+    console.error(`All ${maxRetries} retry attempts failed`);
     throw lastError;
 }
 
@@ -242,7 +242,7 @@ export async function replaceQuotesWithEnhancements(report, enhancementResults) 
             if (enhancedReport.includes(result.original_quote)) {
                 enhancedReport = enhancedReport.replace(result.original_quote, result.enhanced_content);
                 replacementCount++;
-                console.log(`✅ Enhanced quote for task: ${result.research_task}`);
+                console.log(`Enhanced quote for task: ${result.research_task}`);
             } else {
                 // Try normalized matching (remove extra spaces, line breaks)
                 const normalizedOriginal = result.original_quote.replace(/\s+/g, ' ').trim();
@@ -279,37 +279,37 @@ export async function replaceQuotesWithEnhancements(report, enhancementResults) 
                         const actualQuote = enhancedReport.substring(originalIndex, endIndex);
                         enhancedReport = enhancedReport.replace(actualQuote, result.enhanced_content);
                         replacementCount++;
-                        console.log(`✅ Enhanced quote (normalized match) for task: ${result.research_task}`);
+                        console.log(`Enhanced quote (normalized match) for task: ${result.research_task}`);
                     } else {
-                        console.log(`⚠️ Quote not found even with normalization for task: ${result.research_task}`);
+                        console.log(`Quote not found even with normalization for task: ${result.research_task}`);
                     }
                 } else {
-                    console.log(`⚠️ Quote not found for task: ${result.research_task}`);
+                    console.log(`Quote not found for task: ${result.research_task}`);
                     console.log(`   Looking for: "${result.original_quote}"`);
                 }
             }
         }
     }
 
-    console.log(`📊 Total replacements made: ${replacementCount}/${sortedResults.length}`);
+    console.log(`Total replacements made: ${replacementCount}/${sortedResults.length}`);
     return enhancedReport;
 }
 
 export async function orchestrateMasterSubAgentSystem(report, transcript, fileUris, model, visualizationCallback = null) {
-    console.log('🎯 启动主-子代理增强系统...');
+    console.log('启动主-子代理增强系统...');
 
     // Safety check for input report
     if (!report || typeof report !== 'string') {
-        console.error('❌ 输入报告无效，跳过增强系统');
+        console.error('输入报告无效，跳过增强系统');this
         return report || '报告生成失败';
     }
 
     // Step 1: Master agent identifies enhancement tasks
-    console.log('🔍 主代理分析报告，识别增强任务...');
+    console.log('主代理分析报告，识别增强任务...');
     const enhancementTasks = await identifyEnhancementTasks(report, model);
 
     if (!enhancementTasks || !enhancementTasks.enhancement_tasks) {
-        console.log('❌ 未识别到需要增强的任务，返回原始报告');
+        console.log('未识别到需要增强的任务，返回原始报告');
         return report;
     }
 
@@ -344,11 +344,11 @@ export async function orchestrateMasterSubAgentSystem(report, transcript, fileUr
     );
 
     if (highPriorityTasks.length === 0) {
-        console.log('💡 未发现高优先级增强任务，返回原始报告');
+        console.log('未发现高优先级增强任务，返回原始报告');
         return report;
     }
 
-    console.log(`🔬 执行 ${highPriorityTasks.length} 个高优先级子代理任务...`);
+    console.log(`执行 ${highPriorityTasks.length} 个高优先级子代理任务...`);
 
     // Step 3: Execute sub-agents in parallel with immediate result notifications
     const subAgentPromises = highPriorityTasks.map(async (task, index) => {
@@ -397,7 +397,7 @@ export async function orchestrateMasterSubAgentSystem(report, transcript, fileUr
     }
 
     // Step 4: Replace quotes with enhanced content
-    console.log('🔄 替换原始片段为增强内容...');
+    console.log('替换原始片段为增强内容...');
     const enhancedReport = await replaceQuotesWithEnhancements(report, enhancementResults);
 
     const originalLength = report.length;
@@ -406,11 +406,11 @@ export async function orchestrateMasterSubAgentSystem(report, transcript, fileUr
 
     // Final safety check
     if (!enhancedReport || typeof enhancedReport !== 'string') {
-        console.error('❌ 增强后的报告无效，返回原始报告');
+        console.error('增强后的报告无效，返回原始报告');
         return report;
     }
 
-    console.log(`✅ 报告增强完成！`);
+    console.log(`报告增强完成！`);
     console.log(`原始长度: ${originalLength} 字符`);
     console.log(`增强长度: ${enhancedLength} 字符`);
     console.log(`改进幅度: ${improvementPercentage}%`);
