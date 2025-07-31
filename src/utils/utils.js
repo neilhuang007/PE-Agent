@@ -57,13 +57,13 @@ export function saveApiKey(apiKey) {
     localStorage.setItem('gemini_api_key', apiKey);
 }
 
-// Download report as text file
+// Download report as markdown file
 export function downloadReport(report) {
     const companyName = document.getElementById('companyName').value;
     const date = new Date().toISOString().split('T')[0];
-    const filename = `${companyName}访谈纪要_${date}.txt`;
+    const filename = `${companyName}访谈纪要_${date}.md`;
     
-    const blob = new Blob([report], { type: 'text/plain;charset=utf-8' });
+    const blob = new Blob([report], { type: 'text/markdown;charset=utf-8' });
     const url = window.URL.createObjectURL(blob);
     const a = document.createElement('a');
     a.href = url;

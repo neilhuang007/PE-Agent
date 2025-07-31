@@ -1,5 +1,5 @@
 // Master-SubAgent System - Quote-based targeted enhancement
-import { generateWithRetry, convertContentParts } from './src/utils/gemini-wrapper.js';
+import {generateWithRetry, convertContentParts} from './src/utils/gemini-wrapper.js';
 
 // Retry configuration for handling API errors
 const MAX_RETRIES = 3;
@@ -14,93 +14,111 @@ function sleep(ms) {
 // Retry wrapper for API calls
 async function retryWithBackoff(apiCall, maxRetries = MAX_RETRIES) {
     let lastError;
-    
+
     for (let attempt = 0; attempt < maxRetries; attempt++) {
         try {
             return await apiCall();
         } catch (error) {
             lastError = error;
-            
+
             // Check if it's a 503 overload error
-            if (error.status === 503 || 
-                error.code === 503 || 
+            if (error.status === 503 ||
+                error.code === 503 ||
                 (error.message && error.message.includes('overloaded')) ||
                 (error.message && error.message.includes('503'))) {
-                
+
                 const delay = INITIAL_DELAY * Math.pow(BACKOFF_MULTIPLIER, attempt);
                 console.log(`⚠️ Model overloaded (attempt ${attempt + 1}/${maxRetries}). Retrying in ${delay}ms...`);
                 await sleep(delay);
                 continue;
             }
-            
+
             // Check for rate limit errors
-            if (error.status === 429 || 
-                error.code === 429 || 
+            if (error.status === 429 ||
+                error.code === 429 ||
                 (error.message && error.message.includes('rate limit'))) {
-                
+
                 const delay = INITIAL_DELAY * Math.pow(BACKOFF_MULTIPLIER, attempt) * 2; // Longer delay for rate limits
                 console.log(`⚠️ Rate limit hit (attempt ${attempt + 1}/${maxRetries}). Retrying in ${delay}ms...`);
                 await sleep(delay);
                 continue;
             }
-            
+
             // For other errors, throw immediately
             throw error;
         }
     }
-    
+
     // If all retries failed, throw the last error
     console.error(`❌ All ${maxRetries} retry attempts failed`);
     throw lastError;
 }
 
 export async function identifyEnhancementTasks(report, model) {
-    const prompt = `你是一位顶级的投资分析师和报告质量专家。请分析以下PE访谈报告，识别需要深度增强的具体内容片段。
+    const prompt = `Find specific text segments requiring research enhancement.
 
-报告内容：
-${report}
+CRITICAL: Extract exact quotes from the report - character-for-character precision required for text substitution.
 
-任务：识别报告中信息不充分、需要专业深挖的具体引用片段，为每个片段设计专门的研究任务。
+IDENTIFICATION TARGETS:
 
-识别标准：
-1. 财务数据缺乏细节或上下文
-2. 竞争对手信息过于简略
-3. 技术描述缺乏专业深度
-4. 市场数据需要验证或补充
-5. 商业模式细节不够清晰
-6. 团队背景信息有限
-7. 客户信息需要更多细节
-8. 风险因素描述不充分
+    Financial claims without specific numbers or percentages
 
-输出JSON格式：
+    Vague competitor references without details
+
+    Generic technology descriptions lacking depth
+
+    Unsubstantiated market size claims
+
+    Unclear business model mechanics
+
+    Generic team descriptions without credentials
+
+    Customer statements without specifics
+
+QUOTE EXTRACTION RULES:
+
+    Copy text exactly as written - preserve all punctuation, capitalization, quotes
+
+    Select single sentences only - never combine separate statements
+
+    Choose shortest segment that captures the gap (50-150 characters ideal)
+
+    Scan systematically through entire report - miss nothing
+
+    Test: your quote must be findable with Ctrl+F in original text
+
+TASK FOCUS:
+
+    Target gaps affecting valuation accuracy and competitive assessment
+
+    Prioritize quantifiable data gaps over qualitative ones
+
+    Limit to 8 most critical gaps maximum
+
+OUTPUT JSON:
 {
-  "enhancement_tasks": [
-    {
-      "task_id": "唯一任务ID",
-      "research_task": "具体的研究任务描述",
-      "original_quote": "需要增强的原始报告片段（完整引用）",
-      "enhancement_focus": "增强重点（如补充财务细节、竞争对手数据等）",
-      "expected_improvement": "期望的改进效果",
-      "priority": "high/medium/low",
-      "data_sources_needed": ["需要的数据来源类型"]
-    }
-  ],
-  "overall_strategy": "整体增强策略",
-  "total_tasks": "任务总数"
+"enhancement_tasks": [
+{
+"task_id": "unique_id",
+"research_task": "specific data/analysis needed",
+"original_quote": "exact text from report",
+"enhancement_focus": "data type needed",
+"expected_improvement": "investment decision impact",
+"priority": "high/medium/low",
+"data_sources_needed": ["source types"]
+}
+],
+"overall_strategy": "research approach summary",
+"total_tasks": "number"
 }
 
-要求：
-- 只选择真正能显著提升报告价值的片段
-- 每个原始引用必须是报告中的完整、准确片段，从报告中逐字复制，保持所有标点符号和格式
-- original_quote必须是可以在报告中找到的连续文本，不要跨段落引用
-- 避免引用包含特殊格式（如编号、项目符号）的片段
-- 研究任务要具体、可执行
-- 优先选择对投资决策有直接影响的内容
-- 每个引用片段长度在50-300字之间为宜`;
+REPORT CONTENT:
+${report}
+`;
 
     try {
-        const parts = convertContentParts([{ text: prompt }]);
-        const text = await generateWithRetry(parts, '增强任务识别专家', -1);
+        const parts = convertContentParts([{text: prompt}]);
+        const text = await generateWithRetry(parts, 'You are an investment analyst identifying data gaps in PE interview reports.', -1);
         const jsonMatch = text.match(/\{[\s\S]*\}/);
         if (jsonMatch) {
             return JSON.parse(jsonMatch[0]);
@@ -115,34 +133,36 @@ ${report}
 export async function executeSubAgentTask(task, report, transcript, fileUris, model) {
     // Build content parts for the sub-agent
     const contentParts = [
-        { text: `你是一位专业的子代理，专门研究 ${task.research_task}。
+        {
+            text: `You are a data research specialist. Your task is to find specific factual information to enhance the following report segment.
 
-**你的具体任务：**
+**RESEARCH TASK:**
 ${task.research_task}
 
-**增强重点：**
+**ENHANCEMENT FOCUS:**
 ${task.enhancement_focus}
 
-**期望改进：**
+**EXPECTED IMPROVEMENT:**
 ${task.expected_improvement}
 
-**原始报告片段（需要增强）：**
+**ORIGINAL REPORT SEGMENT (to be enhanced):**
 "${task.original_quote}"
 
-**完整报告上下文：**
+**FULL REPORT CONTEXT:**
 ${report}
 
-**访谈记录：**
-${transcript}` }
+**INTERVIEW TRANSCRIPT:**
+${transcript}`
+        }
     ];
 
-    // Add uploaded files as context
+// Add uploaded files as context
     if (fileUris && fileUris.length > 0) {
-        contentParts.push({ text: '\n\n**参考文档：**' });
+        contentParts.push({text: '\n\n**REFERENCE DOCUMENTS:**'});
         fileUris.forEach(file => {
             if (file.content) {
                 // For local TXT files
-                contentParts.push({ text: `\n文档：${file.displayName}\n${file.content}` });
+                contentParts.push({text: `\nDocument: ${file.displayName}\n${file.content}`});
             } else {
                 // For uploaded files
                 contentParts.push({
@@ -155,27 +175,37 @@ ${transcript}` }
         });
     }
 
-    contentParts.push({ text: `
+    contentParts.push({
+        text: `
 
-**你的任务：**
-请在上述所有资料中寻找与原始片段相关的详细信息，然后生成一个增强版本来替换原始片段。
+**YOUR TASK:**
+Search all provided materials above for factual data that can replace or enhance the original segment.
 
-**增强要求：**
-1. 保持原始片段的上下文和逻辑位置
-2. 大幅增加信息密度和专业深度
-3. 补充具体数据、数字、时间、人名等细节
-4. 提供更深入的行业洞察和专业分析
-5. 确保所有信息都有事实依据
-6. 使用专业的投资分析语言
+**ENHANCEMENT RULES:**
+1. ONLY add factual data found in the provided materials (numbers, dates, names, specific details)
+2. If NO additional data is found, return the original quote exactly as written
+3. For vague terms, add factual explanations or definitions found in materials
+4. NEVER add personal opinions, judgments, or analysis
+5. NEVER add information not present in the provided sources
+6. Maintain the same sentence structure and context as the original
+7. Replace vague language with specific data when available
 
-**输出格式：**
-只输出增强后的文本内容，用于直接替换原始片段。不要包含任何其他说明或格式标记。
+**FORBIDDEN:**
+- Personal assessments ("strong," "impressive," "concerning")
+- Interpretations or conclusions
+- External knowledge not in provided materials
+- Speculative language
 
-增强后的内容：` });
+**OUTPUT FORMAT:**
+Return only the enhanced text segment for direct substitution. If no enhancement data is found, return the original quote unchanged.
+
+Enhanced segment:`
+    });
+
 
     try {
         const gParts = convertContentParts(contentParts);
-        const resultText = await generateWithRetry(gParts, '增强执行专家', -1);
+        const resultText = await generateWithRetry(gParts, 'You are a data research specialist.', -1);
         return {
             task_id: task.task_id,
             original_quote: task.original_quote,
@@ -199,10 +229,10 @@ ${transcript}` }
 export async function replaceQuotesWithEnhancements(report, enhancementResults) {
     let enhancedReport = report;
     let replacementCount = 0;
-    
+
     // Sort by priority (high first) and process replacements
     const sortedResults = enhancementResults.sort((a, b) => {
-        const priorityOrder = { high: 3, medium: 2, low: 1 };
+        const priorityOrder = {high: 3, medium: 2, low: 1};
         return priorityOrder[b.priority] - priorityOrder[a.priority];
     });
 
@@ -217,13 +247,13 @@ export async function replaceQuotesWithEnhancements(report, enhancementResults) 
                 // Try normalized matching (remove extra spaces, line breaks)
                 const normalizedOriginal = result.original_quote.replace(/\s+/g, ' ').trim();
                 const normalizedReport = enhancedReport.replace(/\s+/g, ' ');
-                
+
                 if (normalizedReport.includes(normalizedOriginal)) {
                     // Find the actual text in the report that matches the normalized version
                     const startIndex = normalizedReport.indexOf(normalizedOriginal);
                     let endIndex = startIndex;
                     let originalIndex = 0;
-                    
+
                     // Map back to original report indices
                     for (let i = 0, j = 0; i < enhancedReport.length && j <= startIndex + normalizedOriginal.length; i++) {
                         if (enhancedReport[i].match(/\s/) && normalizedReport[j] === ' ') {
@@ -235,7 +265,7 @@ export async function replaceQuotesWithEnhancements(report, enhancementResults) 
                         } else if (!enhancedReport[i].match(/\s/)) {
                             j++;
                         }
-                        
+
                         if (j === startIndex && originalIndex === 0) {
                             originalIndex = i;
                         }
@@ -244,7 +274,7 @@ export async function replaceQuotesWithEnhancements(report, enhancementResults) 
                             break;
                         }
                     }
-                    
+
                     if (originalIndex > 0 && endIndex > originalIndex) {
                         const actualQuote = enhancedReport.substring(originalIndex, endIndex);
                         enhancedReport = enhancedReport.replace(actualQuote, result.enhanced_content);
@@ -312,7 +342,7 @@ export async function orchestrateMasterSubAgentSystem(report, transcript, fileUr
     console.log(`🔬 执行 ${highPriorityTasks.length} 个高优先级子代理任务...`);
 
     // Step 3: Execute sub-agents in parallel
-    const subAgentPromises = highPriorityTasks.map(task => 
+    const subAgentPromises = highPriorityTasks.map(task =>
         executeSubAgentTask(task, report, transcript, fileUris, model)
     );
 

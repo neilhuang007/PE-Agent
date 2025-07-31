@@ -23,48 +23,6 @@
     "critical": "If information conflicts with external knowledge, follow the interview. If details are unclear, note the ambiguity rather than clarifying from other sources.",
     "outputFormat": "Comprehensive summary with all data points preserved"
   },
-  "architectInformation": {
-    "role": "AI agent who Organize data into sections. Keep ALL numbers, tables, percentages.",
-    "task": "Sort extracted data by section. Preserve every data point.",
-    "sections": {
-      "公司简介": "Team names, roles, backgrounds, equity",
-      "行业情况": "Market size, growth rates, competitor data", 
-      "主营业务": "Products, pricing, revenue models",
-      "财务情况": "ALL financial figures, tables, projections",
-      "融资情况": "Funding amounts, valuations, investor names"
-    },
-    "outputFormat": "JSON with Chinese content. Include every number and table."
-  },
-  "masterComposeReport": {
-    "role": "PE report writer",
-    "task": "Generate interview summary report organizing information into specific sections only, can add subsections based on the information provided",
-    "reportStructure": {
-      "companyIntro": {
-        "title": "【公司简介】",
-        "subsections": ["公司概述", "核心团队"]
-      },
-      "industry": {
-        "title": "【行业情况】"
-      },
-      "business": {
-        "title": "【主营业务】"
-      },
-      "financials": {
-        "title": "【财务情况】"
-      },
-      "funding": {
-        "title": "【融资情况】",
-        "subsections": ["融资历史"]
-      }
-    },
-      "writingStandards": [
-      "Use factual information from interview and research files only",
-      "DO NOT ADD SUGGESTIONS OR ANALYSIS",
-      "provide the facts in a professional and precise way",
-      "Include all specific numbers and data points",
-      "Keep sections detailed and comprehensive"
-    ]
-  },
   "verifyCitations": {
     "role": "Agent to check ALL numbers, tables, names are included in report.",
     "task": "Verify every data point from summaries appears in report.",
@@ -76,11 +34,6 @@
     ],
     "outputFormat": "JSON with missing items list"
   },
-  "crossValidateFacts": {
-    "role": "Check if data point exists in report.",
-    "task": "Answer yes if exact data found, no if missing.",
-    "outputFormat": "yes | no"
-  },
   "validateExcellence": {
     "role": "Score report data completeness.",
     "task": "Rate 0-100 based on data inclusion.",
@@ -90,48 +43,5 @@
       "All names mentioned"
     ],
     "outputFormat": "JSON with score, pass status, and recommendations"
-  },
-  "intelligentEnrichment": {
-    "role": "Information enhancement specialist",
-    "task": "Find additional relevant details from interview materials",
-    "searchStrategy": [
-      "Re-examine transcripts for missed facts",
-      "Identify gaps in required sections",
-      "Extract additional context"
-    ],
-    "outputFormat": "JSON with new information and target sections"
-  },
-  "integrateEnhancements": {
-    "role": "Content integration specialist", 
-    "task": "Merge additional information into interview summary",
-    "integrationRules": [
-      "Maintain consistent style",
-      "Preserve section structure",
-      "Remove redundancy"
-    ],
-    "outputFormat": "Complete integrated report"
-  },
-  "excellenceFormatter": {
-    "role": "Professional report formatter",
-    "task": "Format interview summary to professional standards",
-    "formattingRules": [
-      "Clear section headings (### main, #### sub)",
-      "Bold important data with **bold**",
-      "Consistent paragraph spacing",
-      "number paragraphs using numbers",
-      "2 blank lines before section heading",
-      "1 blank line before subsection heading"
-    ],
-    "outputFormat": "Complete formatted report"
-  },
-  "finalQualityInspection": {
-    "role": "Final quality controller",
-    "task": "Final review of interview summary", 
-    "inspectionChecklist": [
-      "All required sections present",
-      "Data accuracy verified",
-      "Professional formatting consistent"
-    ],
-    "outputFormat": "JSON with final approval status and any needed corrections"
   }
 }

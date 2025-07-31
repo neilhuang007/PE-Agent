@@ -71,7 +71,7 @@
                     </div>
 
                     <div class="form-group">
-                        <label>
+                        <label>/clear
                             <input type="checkbox" id="showProcessDetails" checked>
                             📊 显示处理详情
                         </label>
@@ -88,6 +88,110 @@
                     <p class="progress-text" id="progressText">正在初始化...</p>
                     <div class="chunk-details" id="chunkDetails"></div>
                     <div class="validation-status" id="validationStatus"></div>
+                </div>
+
+                <!-- Progress Stepper Card -->
+                <div class="progress-stepper-card" id="progressStepperCard">
+                    <h3>📋 处理进度</h3>
+                    <div class="stepper-box">
+                        <div class="stepper-step stepper-pending" id="step-document-analysis">
+                            <div class="stepper-circle">1</div>
+                            <div class="stepper-line"></div>
+                            <div class="stepper-content">
+                                <div class="stepper-title">文档分析</div>
+                                <div class="stepper-status">待处理</div>
+                                <div class="stepper-time">等待开始...</div>
+                            </div>
+                            <button class="stepper-details-btn" onclick="showStepDetails('step-document-analysis')">
+                                查看详情
+                            </button>
+                        </div>
+
+                        <div class="stepper-step stepper-pending" id="step-chunk-extraction">
+                            <div class="stepper-circle">2</div>
+                            <div class="stepper-line"></div>
+                            <div class="stepper-content">
+                                <div class="stepper-title">内容提取</div>
+                                <div class="stepper-status">待处理</div>
+                                <div class="stepper-time">等待开始...</div>
+                            </div>
+                            <button class="stepper-details-btn" onclick="showStepDetails('step-chunk-extraction')">
+                                查看详情
+                            </button>
+                        </div>
+
+                        <div class="stepper-step stepper-pending" id="step-report-generation">
+                            <div class="stepper-circle">3</div>
+                            <div class="stepper-line"></div>
+                            <div class="stepper-content">
+                                <div class="stepper-title">报告生成</div>
+                                <div class="stepper-status">待处理</div>
+                                <div class="stepper-time">等待开始...</div>
+                            </div>
+                            <button class="stepper-details-btn" onclick="showStepDetails('step-report-generation')">
+                                查看详情
+                            </button>
+                        </div>
+
+                        <div class="stepper-step stepper-pending" id="step-enhancement">
+                            <div class="stepper-circle">4</div>
+                            <div class="stepper-line"></div>
+                            <div class="stepper-content">
+                                <div class="stepper-title">内容增强</div>
+                                <div class="stepper-status">待处理</div>
+                                <div class="stepper-time">等待开始...</div>
+                            </div>
+                            <button class="stepper-details-btn" onclick="showStepDetails('step-enhancement')">
+                                查看详情
+                            </button>
+                        </div>
+
+                        <div class="stepper-step stepper-pending" id="step-finalization">
+                            <div class="stepper-circle">5</div>
+                            <div class="stepper-content">
+                                <div class="stepper-title">最终处理</div>
+                                <div class="stepper-status">待处理</div>
+                                <div class="stepper-time">等待开始...</div>
+                            </div>
+                            <button class="stepper-details-btn" onclick="showStepDetails('step-finalization')">
+                                查看详情
+                            </button>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Step Details Modal -->
+                <div id="stepDetailsModal" class="modal">
+                    <div class="modal-content">
+                        <div class="modal-header">
+                            <h2 id="stepDetailsTitle">步骤详情</h2>
+                            <span class="close-btn" onclick="closeStepDetailsModal()">&times;</span>
+                        </div>
+                        <div class="modal-body">
+                            <div class="step-details-navigation">
+                                <div class="stepper-controls">
+                                    <button class="stepper-button" id="prevStepCard" onclick="navigateStepCards(-1)">
+                                        <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" class="bi bi-arrow-left" viewBox="0 0 16 16">
+                                            <path fill-rule="evenodd" d="M15 8a.5.5 0 0 0-.5-.5H2.707l3.147-3.146a.5.5 0 1 0-.708-.708l-4 4a.5.5 0 0 0 0 .708l4 4a.5.5 0 0 0 .708-.708L2.707 8.5H14.5A.5.5 0 0 0 15 8"/>
+                                        </svg>
+                                        Previous
+                                    </button>
+                                    <span id="stepCardIndicator">1 / 1</span>
+                                    <button class="stepper-button stepper-button-primary" id="nextStepCard" onclick="navigateStepCards(1)">
+                                        Next
+                                        <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" class="bi bi-arrow-right" viewBox="0 0 16 16">
+                                            <path fill-rule="evenodd" d="M1 8a.5.5 0 0 1 .5-.5h11.793l-3.147-3.146a.5.5 0 0 1 .708-.708l4 4a.5.5 0 0 1 0 .708l-4 4a.5.5 0 0 1-.708-.708L13.293 8.5H1.5A.5.5 0 0 1 1 8"/>
+                                        </svg>
+                                    </button>
+                                </div>
+                            </div>
+                            <div class="step-details-content">
+                                <div id="stepDetailsContent">
+                                    <!-- Dynamic content will be inserted here -->
+                                </div>
+                            </div>
+                        </div>
+                    </div>
                 </div>
             </div>
 

@@ -99,7 +99,8 @@ async function callGeminiDirect(contents, systemPrompt, thinkingBudget, model) {
     const response = await fetchImpl(url, fetchOptions);
     const data = await response.json();
     if (!response.ok) {
-        throw new Error(`API Error: ${JSON.stringify(data)}`);
+        const errorMsg = `API Error ${response.status}: ${data.error?.message || JSON.stringify(data)}`;
+        throw new Error(errorMsg);
     }
     // Return the first candidate’s text if present
     return data.candidates?.[0]?.content?.parts?.[0]?.text || '';
@@ -133,9 +134,9 @@ async function callGeminiStream(contents, systemPrompt, thinkingBudget = -1, mod
     return text;
 }
 /**
- * Wrapper to retry the request a few times before throwing an error.
+ * Wrapper to retry the request with exponential backoff and specific handling for HTTP errors.
  */
-export async function generateWithRetry(contents, systemPrompt, thinkingBudget = -1, model = 'gemini-2.5-pro', retries = 3) {
+export async function generateWithRetry(contents, systemPrompt, thinkingBudget = -1, model = 'gemini-2.5-pro', retries = 5) {
     let lastError;
     for (let attempt = 0; attempt < retries; attempt++) {
         try {
@@ -143,8 +144,32 @@ export async function generateWithRetry(contents, systemPrompt, thinkingBudget =
         }
         catch (err) {
             lastError = err;
+            console.warn(`API call attempt ${attempt + 1}/${retries} failed:`, err.message);
+            
+            // Check if it's a retryable error (503, 429, network issues)
+            const isRetryable = err.message.includes('503') || 
+                               err.message.includes('429') || 
+                               err.message.includes('Service Unavailable') ||
+                               err.message.includes('Rate limit') ||
+                               err.message.includes('network') ||
+                               err.message.includes('timeout');
+            
+            // Don't retry on non-retryable errors (400, 401, 403, etc.)
+            if (!isRetryable && attempt > 0) {
+                console.error('Non-retryable error encountered, stopping retries:', err.message);
+                break;
+            }
+            
+            // Don't wait on the last attempt
+            if (attempt < retries - 1) {
+                // Exponential backoff: 1s, 2s, 4s, 8s
+                const waitTime = Math.min(1000 * Math.pow(2, attempt), 8000);
+                console.log(`Waiting ${waitTime}ms before retry...`);
+                await new Promise(resolve => setTimeout(resolve, waitTime));
+            }
         }
     }
+    console.error(`All ${retries} retry attempts failed. Last error:`, lastError.message);
     throw lastError;
 }
 /**
