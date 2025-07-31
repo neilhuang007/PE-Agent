@@ -17,6 +17,7 @@ import { detectAndRemoveBias } from './src/agents/bias-detection-agent.js';
 import { orchestrateMasterSubAgentSystem } from './master-subagent-system.js';
 import { chunkTranscript, updateProgress, getApiKey, saveApiKey, downloadReport, assembleRawDraft } from './src/utils/utils.js';
 import { finalReportFormatter, quickFinalFormatter, formatForDisplay } from './src/agents/final-formatter.js';
+import { marked } from 'https://cdn.jsdelivr.net/npm/marked@11.2.0/+esm';
 
 let currentReport = '';
 let allUploadedFiles = []; // Store all uploaded files across multiple sessions
@@ -107,7 +108,7 @@ function updateStepper(stepId, status, data = '', subCardData = null) {
             `;
             // Add check icon to status and remove spinner
             addCheckToTaskStatus(stepId);
-            statusElement.textContent = '已完成';
+            statusElement.textContent = '';
             stepperData[stepId].endTime = now;
             const duration = stepperData[stepId].startTime ? 
                 Math.round((now.getTime() - stepperData[stepId].startTime.getTime()) / 1000) : 0;
@@ -118,7 +119,7 @@ function updateStepper(stepId, status, data = '', subCardData = null) {
             step.classList.add('stepper-pending');
             // Add waiting spinner to status
             addSpinnerToTaskStatus(stepId, 'waiting');
-            statusElement.textContent = '待处理';
+            statusElement.textContent = '';
             timeElement.textContent = '等待开始...';
             break;
     }
@@ -262,6 +263,19 @@ function addCheckToTaskStatus(containerId) {
     }
 }
 
+function getStatusIcon(status) {
+    switch(status) {
+        case 'pending':
+            return '<div class="spinner-small spinner-waiting"></div>';
+        case 'processing':
+            return '<div class="spinner-small spinner-processing"></div>';
+        case 'completed':
+            return '<svg class="check-icon" viewBox="0 0 16 16" fill="currentColor"><path d="M12.736 3.97a.733.733 0 0 1 1.047 0c.286.289.29.756.01 1.05L7.88 12.01a.733.733 0 0 1-1.065.02L3.217 8.384a.757.757 0 0 1 0-1.06.733.733 0 0 1 1.047 0l3.052 3.093 5.4-6.425z"></path></svg>';
+        default:
+            return '';
+    }
+}
+
 function updateTaskStatusWithSpinner(taskId, status) {
     const statusElement = document.getElementById(`${taskId}-status`);
     if (!statusElement) return;
@@ -269,15 +283,15 @@ function updateTaskStatusWithSpinner(taskId, status) {
     switch(status) {
         case 'pending':
             addSpinnerToTaskStatus(`${taskId}-status`, 'waiting');
-            statusElement.innerHTML = statusElement.innerHTML.replace(/^[^a-zA-Z\u4e00-\u9fff]*/, '') || '等待处理';
+            statusElement.textContent = '';
             break;
         case 'processing':
             addSpinnerToTaskStatus(`${taskId}-status`, 'processing');
-            statusElement.innerHTML = statusElement.innerHTML.replace(/^[^a-zA-Z\u4e00-\u9fff]*/, '') || '正在分析增强...';
+            statusElement.textContent = '';
             break;
         case 'completed':
             addCheckToTaskStatus(`${taskId}-status`);
-            statusElement.innerHTML = statusElement.innerHTML.replace(/^[^a-zA-Z\u4e00-\u9fff]*/, '') || '增强完成';
+            statusElement.textContent = '';
             break;
         case 'error':
             removeSpinnerFromTaskStatus(`${taskId}-status`);
@@ -530,11 +544,10 @@ function formatSimpleTaskContent(cardData, cardIndex, isCompleted, isProcessing,
 
 function renderEnhancementMaster(tasks) {
     let rows = tasks.map((t, i) => {
-        const statusMap = { pending: '待处理', processing: '处理中', completed: '已完成' };
         return `<div class="master-task-row">
             <span class="task-index">任务 ${i + 1}</span>
             <span class="task-name">${t.task.research_task}</span>
-            <span class="task-status-badge ${t.status}">${statusMap[t.status] || t.status}</span>
+            <span class="task-status-badge ${t.status}">${getStatusIcon(t.status)}</span>
         </div>`;
     }).join('');
     return `<div class="step-card-content">
@@ -545,7 +558,6 @@ function renderEnhancementMaster(tasks) {
 
 function renderEnhancementMasterWithAnimation(tasks) {
     const taskCount = tasks.length;
-    const statusMap = { pending: '待处理', processing: '处理中', completed: '已完成' };
     
     // Generate dynamic orbiting dots distributed across different orbits
     let orbitalRings = '';
@@ -570,7 +582,7 @@ function renderEnhancementMasterWithAnimation(tasks) {
         return `<div class="master-task-row">
             <span class="task-index">任务 ${i + 1}</span>
             <span class="task-name">${t.task.research_task}</span>
-            <span class="task-status-badge ${t.status}">${statusMap[t.status] || t.status}</span>
+            <span class="task-status-badge ${t.status}">${getStatusIcon(t.status)}</span>
         </div>`;
     }).join('');
     
@@ -601,15 +613,14 @@ function renderEnhancementMasterWithAnimation(tasks) {
 }
 
 function renderEnhancementTask(taskObj, cardIndex, total) {
-    const statusMap = { pending: '待处理', processing: '处理中', completed: '已完成' };
-    let header = `子任务 ${cardIndex} - ${statusMap[taskObj.status] || taskObj.status}`;
+    let header = `子任务 ${cardIndex} - ${taskObj.status}`;
     if (taskObj.status === 'completed') {
         const isChanged = taskObj.result.enhanced_content !== taskObj.result.original_quote;
         const diff = taskObj.result.enhanced_content.length - taskObj.result.original_quote.length;
         let card = `${isChanged ? '已增强' : '保持原样'} 子任务 ${cardIndex} 完成\n研究任务: ${taskObj.task.research_task}\n优先级: ${taskObj.task.priority}\n状态: 完成 (${diff >= 0 ? '+' : ''}${diff} 字符)\n\n原始内容 (${taskObj.result.original_quote.length} 字符):\n${taskObj.result.original_quote}\n\n增强内容 (${taskObj.result.enhanced_content.length} 字符):\n${taskObj.result.enhanced_content}${taskObj.result.error ? '\n\n错误: ' + taskObj.result.error : ''}`;
         return formatTaskContent(card, cardIndex);
     } else {
-        let card = `任务 ${cardIndex}/${total} 开始\n研究任务: ${taskObj.task.research_task}\n优先级: ${taskObj.task.priority}\n状态: ${statusMap[taskObj.status]}`;
+        let card = `任务 ${cardIndex}/${total} 开始\n研究任务: ${taskObj.task.research_task}\n优先级: ${taskObj.task.priority}\n状态: ${taskObj.status}`;
         return formatTaskContent(card, cardIndex);
     }
 }
@@ -724,7 +735,7 @@ async function generateReport(e) {
             try {
                 // Create callback to update stepper as files complete
                 const fileAnalysisCallback = (fileIndex, fileName, analysis) => {
-                    const fileAnalysis = `文件: ${fileName}\n分析结果: 已成功处理\n类型: ${allUploadedFiles[fileIndex]?.mimeType || 'unknown'}\n\n提取内容预览:\n${analysis}...`;
+                    const fileAnalysis = `文件: ${fileName}\n分析结果: 已成功处理\n类型: ${allUploadedFiles[fileIndex]?.mimeType || 'unknown'}\n\n提取内容:\n${analysis}`;
                     updateStepper('step-document-analysis', 'active', '', fileAnalysis);
                     console.log(`文件 ${fileIndex + 1} 分析完成: ${fileName} - ${analysis.length} 字符`);
                 };
@@ -756,8 +767,8 @@ async function generateReport(e) {
         updateStepper('step-chunk-extraction', 'active');
         updateProgress(30, isSpeedMode ? '快速模式：优化处理流程...' : '开始深度分析访谈内容...');
         const chunks = chunkTranscript(transcript);
-        updateProgress(35, `已将访谈内容分成${chunks.length}个片段`, 
-            chunks.map((c, i) => `片段${i+1}: ${c}...`).join('<br>'));
+        updateProgress(35, `已将访谈内容分成${chunks.length}个片段`,
+            chunks.map((c, i) => `片段${i+1}: ${c}`).join('<br>'));
         
         let extractedChunks, organizedInfo, localReport, architecturedInfo, rawDraft;
         
@@ -783,7 +794,7 @@ async function generateReport(e) {
                     extractedChunks[i] = result;
                     
                     // Add chunk result immediately when it completes
-                    const chunkData = `片段 ${i + 1}:\n原始内容: ${chunk}...\n\n提取结果:\n${result}`;
+                    const chunkData = `片段 ${i + 1}:\n原始内容: ${chunk}\n\n提取结果:\n${result}`;
                     updateStepper('step-chunk-extraction', 'active', '', chunkData);
                     
                     console.log(`片段 ${i + 1} 提取完成 - ${result.length} 字符`);
@@ -819,7 +830,7 @@ async function generateReport(e) {
             localReport = await fastComposeReport(rawData, companyName, fastModel);
             
             // Add report generation details as sub-card
-            const reportGenData = `快速报告生成:\n公司名称: ${companyName}\n原始数据长度: ${rawData.length} 字符\n生成的报告长度: ${localReport.length} 字符\n\n生成的报告:\n${localReport}...`;
+            const reportGenData = `快速报告生成:\n公司名称: ${companyName}\n原始数据长度: ${rawData.length} 字符\n生成的报告长度: ${localReport.length} 字符\n\n生成的报告:\n${localReport}`;
             updateStepper('step-report-generation', 'active', '', reportGenData);
             updateStepper('step-report-generation', 'completed', `已生成初始报告，长度: ${localReport.length} 字符`);
             
@@ -1299,13 +1310,10 @@ window.showModal = function(title, content) {
     const modal = document.getElementById('contentModal');
     const modalTitle = document.getElementById('modalTitle');
     const modalBody = document.getElementById('modalBody');
-    
+
     modalTitle.textContent = title;
-    // Properly escape HTML content
-    const pre = document.createElement('pre');
-    pre.textContent = content;
-    modalBody.innerHTML = '';
-    modalBody.appendChild(pre);
+    // Render markdown content using marked
+    modalBody.innerHTML = marked.parse(content);
     modal.style.display = 'block';
 }
 
@@ -1348,7 +1356,7 @@ function displayExtractedInfo(extractedChunks, container) {
         html += `
             <div class="info-item" onclick="showModal('片段 ${index + 1} - 完整内容', window.fullContentStore.extractedInfo[${index}])">
                 <h4>片段 ${index + 1}</h4>
-                <pre>${chunk}</pre>
+                <div class="markdown-content">${marked.parse(chunk)}</div>
             </div>
         `;
     });
@@ -1374,7 +1382,7 @@ function displayBusinessPlanData(businessPlanAnalysis, container) {
         </div>
         <div class="info-item" onclick="showModal('商业计划书分析 - 完整内容', window.fullContentStore.businessPlanData)">
             <h4>提取的商业计划书内容</h4>
-            <pre>${businessPlanAnalysis}</pre>
+            <div class="markdown-content">${marked.parse(businessPlanAnalysis)}</div>
             ${businessPlanAnalysis.length > 2000 ? '<p style="text-align: right; color: #007bff; font-size: 0.9em;">点击查看全部 →</p>' : ''}
         </div>
     `;
@@ -1431,7 +1439,6 @@ function displaySubagentTasks(tasks, container) {
                     <h4>任务 ${index + 1}: ${task.research_task}</h4>
                     <div class="task-status pending" id="${taskId}-status">
                         <span class="status-icon"></span>
-                        等待处理
                     </div>
                 </div>
                 
@@ -1471,7 +1478,7 @@ function displaySubagentTasks(tasks, container) {
                             原始内容
                             <span class="content-length">(${task.original_quote.length} 字符)</span>
                         </div>
-                        <div class="content-text">${task.original_quote}</div>
+                        <div class="content-text">${marked.parse(task.original_quote)}</div>
                     </div>
                     
                     <div class="enhanced-content" id="${taskId}-enhanced" style="display: none;">
@@ -1519,7 +1526,7 @@ function updateTaskWithEnhancement(taskIndex, enhancementResult) {
     // Update status with enhanced styling using dynamic spinner system
     const isChanged = enhancementResult.enhanced_content !== enhancementResult.original_quote;
     addCheckToTaskStatus(`${taskId}-status`);
-    statusElement.innerHTML = `${isChanged ? '内容已增强' : '保持原样'}`;
+    statusElement.textContent = '';
     statusElement.className = 'task-status completed';
     
     // Add visual feedback for task completion
@@ -1530,7 +1537,7 @@ function updateTaskWithEnhancement(taskIndex, enhancementResult) {
     
     // Show enhanced content with animation
     enhancedSection.style.display = 'block';
-    enhancedText.innerHTML = enhancementResult.enhanced_content;
+    enhancedText.innerHTML = marked.parse(enhancementResult.enhanced_content);
     
     // Update enhanced content length indicator
     if (enhancedLength) {
