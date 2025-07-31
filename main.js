@@ -279,15 +279,15 @@ function getStatusIcon(status) {
 function updateTaskStatusWithSpinner(taskId, status) {
     const statusElement = document.getElementById(`${taskId}-status`);
     if (!statusElement) return;
-    
+
     switch(status) {
         case 'pending':
             addSpinnerToTaskStatus(`${taskId}-status`, 'waiting');
-            statusElement.textContent = '';
+            statusElement.textContent = '等待处理';
             break;
         case 'processing':
             addSpinnerToTaskStatus(`${taskId}-status`, 'processing');
-            statusElement.textContent = '';
+            statusElement.textContent = '处理中';
             break;
         case 'completed':
             addCheckToTaskStatus(`${taskId}-status`);
