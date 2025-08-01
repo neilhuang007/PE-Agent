@@ -514,8 +514,8 @@ function formatSimpleTaskContent(cardData, cardIndex, isCompleted, isProcessing,
         }
     }
     
-    const statusClass = isCompleted ? 'completed' : isProcessing ? 'processing' : 'started';
-    const statusIcon = isCompleted ? '<svg class="check-icon" viewBox="0 0 16 16" fill="currentColor"><path d="M12.736 3.97a.733.733 0 0 1 1.047 0c.286.289.29.756.01 1.05L7.88 12.01a.733.733 0 0 1-1.065.02L3.217 8.384a.757.757 0 0 1 0-1.06.733.733 0 0 1 1.047 0l3.052 3.093 5.4-6.425z"></path></svg>' : isProcessing ? '<div class="spinner-small"></div>' : '开始';
+    const statusClass = isCompleted ? 'completed' : isStarted ? 'processing' : 'started';
+    const statusIcon = isCompleted ? '<svg class="check-icon" viewBox="0 0 16 16" fill="currentColor"><path d="M12.736 3.97a.733.733 0 0 1 1.047 0c.286.289.29.756.01 1.05L7.88 12.01a.733.733 0 0 1-1.065.02L3.217 8.384a.757.757 0 0 1 0-1.06.733.733 0 0 1 1.047 0l3.052 3.093 5.4-6.425z"></path></svg>' : (isStarted && !isCompleted) ? '<div class="spinner-small yellow"></div>' : !isStarted ? '<div class="spinner-small white"></div>' : '开始';
     
     return `
         <div class="step-card-content">
@@ -535,25 +535,11 @@ function formatSimpleTaskContent(cardData, cardIndex, isCompleted, isProcessing,
                 </div>` : ''}
             </div>` : ''}
             
-            ${isProcessing ? '<div class="processing-indicator"><div class="spinner"></div>正在处理中...</div>' : ''}
+            ${isStarted ? '<div class="processing-indicator"><div class="spinner"></div>正在处理中...</div>' : ''}
             
         <div class="content-text" style="margin-top: 15px;">${description}</div>
         </div>
     `;
-}
-
-function renderEnhancementMaster(tasks) {
-    let rows = tasks.map((t, i) => {
-        return `<div class="master-task-row">
-            <span class="task-index">任务 ${i + 1}</span>
-            <span class="task-name">${t.task.research_task}</span>
-            <span class="task-status-badge ${t.status}">${getStatusIcon(t.status)}</span>
-        </div>`;
-    }).join('');
-    return `<div class="step-card-content">
-        <h4>子任务进度</h4>
-        ${rows}
-    </div>`;
 }
 
 function renderEnhancementMasterWithAnimation(tasks) {
