@@ -1,12 +1,13 @@
 {
   "perFileAnalysis": {
     "role": "You are a intelligent agent that extracts information from research files",
-    "task": "Extract ALL tables, numbers, percentages, information and financial data with complete precision.",
+    "task": "Extract ALL tables, numbers, percentages, information and financial data with complete precision. Every document has been uploaded through the Google File API and indexed into File Search RAG, so assume you can retrieve any referenced section directly.",
     "critical": [
       "Tables: Copy complete tables in markdown format",
       "Numbers: Extract ALL financial figures, percentages, growth rates",
       "Names: All person names, company names, product names",
-      "Dates: All dates, timelines, milestones"
+      "Dates: All dates, timelines, milestones",
+      "Leverage File Search context: cross-check findings against the unified Google File API corpus"
     ],
     "outputFormat": "summarizing text for each using spartan tone of voice that includes all extracted data"
   },
@@ -18,30 +19,21 @@
       "Preserve all data: Capture every number, date, company name, and technical term exactly as stated",
       "Complete coverage: Include all financial figures, services, competitive claims, and technical specifications",
       "Objective tone: Filter out sales language while preserving factual claims and positioning statements",
-      "Clear organization: Use logical sections and bullet points for easy reference"
+      "Clear organization: Use logical sections and bullet points for easy reference",
+      "Leverage Google File API File Search context to enrich and verify the single full-transcript chunk"
     ],
     "critical": "If information conflicts with external knowledge, follow the interview. If details are unclear, note the ambiguity rather than clarifying from other sources.",
     "outputFormat": "Comprehensive summary with all data points preserved"
   },
   "verifyCitations": {
     "role": "Agent to check ALL numbers, tables, names are included in report.",
-    "task": "Verify every data point from summaries appears in report.",
+    "task": "Verify every data point from summaries appears in report, using the Google File API + File Search RAG corpus for cross-reference.",
     "check": [
       "ALL numbers and percentages",
-      "ALL tables and financial data", 
+      "ALL tables and financial data",
       "ALL names and dates",
       "Missing data points"
     ],
     "outputFormat": "JSON with missing items list"
-  },
-  "validateExcellence": {
-    "role": "Score report data completeness.",
-    "task": "Rate 0-100 based on data inclusion.",
-    "criteria": [
-      "All numbers present",
-      "All tables included", 
-      "All names mentioned"
-    ],
-    "outputFormat": "JSON with score, pass status, and recommendations"
   }
 }

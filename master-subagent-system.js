@@ -1,5 +1,5 @@
 // Master-SubAgent System - Quote-based targeted enhancement
-import {generateWithRetry, convertContentParts} from './src/utils/gemini-wrapper.js';
+import {generateWithRetry, convertContentParts, generateWithFileSearch} from './src/utils/gemini-wrapper.js';
 
 // Retry configuration for handling API errors
 const MAX_RETRIES = 3;
@@ -54,7 +54,7 @@ async function retryWithBackoff(apiCall, maxRetries = MAX_RETRIES) {
     throw lastError;
 }
 
-export async function identifyEnhancementTasks(report, model) {
+export async function identifyEnhancementTasks(report, model, fileSearchStoreName = null) {
     const prompt = `Find specific text segments requiring research enhancement.
 
 CRITICAL: Extract exact quotes from the report - character-for-character precision required for text substitution.
@@ -118,7 +118,12 @@ ${report}
 
     try {
         const parts = convertContentParts([{text: prompt}]);
-        const text = await generateWithRetry(parts, 'You are an investment analyst identifying data gaps in PE interview reports.', -1);
+        let text;
+        if (fileSearchStoreName) {
+            text = await generateWithFileSearch(parts, 'You are an investment analyst identifying data gaps in PE interview reports.', fileSearchStoreName, -1, model);
+        } else {
+            text = await generateWithRetry(parts, 'You are an investment analyst identifying data gaps in PE interview reports.', -1, model);
+        }
         const jsonMatch = text.match(/\{[\s\S]*\}/);
         if (jsonMatch) {
             return JSON.parse(jsonMatch[0]);
@@ -130,7 +135,7 @@ ${report}
     }
 }
 
-export async function executeSubAgentTask(task, report, transcript, fileUris, model) {
+export async function executeSubAgentTask(task, report, transcript, fileUris, model, fileSearchStoreName = null) {
     // Build content parts for the sub-agent
     const contentParts = [
         {
@@ -205,7 +210,12 @@ Enhanced segment:`
 
     try {
         const gParts = convertContentParts(contentParts);
-        const resultText = await generateWithRetry(gParts, 'You are a data research specialist.', -1);
+        let resultText;
+        if (fileSearchStoreName) {
+            resultText = await generateWithFileSearch(gParts, 'You are a data research specialist.', fileSearchStoreName, -1, model);
+        } else {
+            resultText = await generateWithRetry(gParts, 'You are a data research specialist.', -1, model);
+        }
         return {
             task_id: task.task_id,
             original_quote: task.original_quote,
@@ -295,18 +305,18 @@ export async function replaceQuotesWithEnhancements(report, enhancementResults) 
     return enhancedReport;
 }
 
-export async function orchestrateMasterSubAgentSystem(report, transcript, fileUris, model, visualizationCallback = null) {
+export async function orchestrateMasterSubAgentSystem(report, transcript, fileUris, model, visualizationCallback = null, fileSearchStoreName = null) {
     console.log('启动主-子代理增强系统...');
 
     // Safety check for input report
     if (!report || typeof report !== 'string') {
-        console.error('输入报告无效，跳过增强系统');this
+        console.error('输入报告无效，跳过增强系统');
         return report || '报告生成失败';
     }
 
     // Step 1: Master agent identifies enhancement tasks
     console.log('主代理分析报告，识别增强任务...');
-    const enhancementTasks = await identifyEnhancementTasks(report, model);
+    const enhancementTasks = await identifyEnhancementTasks(report, model, fileSearchStoreName);
 
     if (!enhancementTasks || !enhancementTasks.enhancement_tasks) {
         console.log('未识别到需要增强的任务，返回原始报告');
@@ -361,7 +371,7 @@ export async function orchestrateMasterSubAgentSystem(report, transcript, fileUr
             });
         }
         
-        const result = await executeSubAgentTask(task, report, transcript, fileUris, model);
+        const result = await executeSubAgentTask(task, report, transcript, fileUris, model, fileSearchStoreName);
         
         // Notify immediately when this subtask completes with the substitution result
         if (visualizationCallback) {

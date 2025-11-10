@@ -1,5 +1,5 @@
 // Bias Detection Agent - Identifies and removes subjective language and AI interpretations
-import { generateWithRetry, convertContentParts } from '../utils/gemini-wrapper.js';
+import { generateWithRetry, convertContentParts, generateWithFileSearch } from '../utils/gemini-wrapper.js';
 
 // Load prompts from centralized JSON files
 let biasDetectionPrompts = null;
@@ -18,7 +18,7 @@ async function loadBiasDetectionPrompts() {
     return biasDetectionPrompts;
 }
 
-export async function detectAndRemoveBias(report, model) {
+export async function detectAndRemoveBias(report, model, fileSearchStoreName = null) {
     const prompts = await loadBiasDetectionPrompts();
     const promptConfig = prompts.detectAndRemoveBias;
     
@@ -28,6 +28,10 @@ export async function detectAndRemoveBias(report, model) {
         return report;
     }
     
+    const ragNotice = fileSearchStoreName
+        ? '\n\nRAG 已启用：请使用统一的 Google File API + File Search 文档上下文验证并消除主观偏见。'
+        : '';
+
     const prompt = `${promptConfig.role}
 
 ${promptConfig.task}
@@ -45,11 +49,16 @@ ${promptConfig.outputFormat}
 report content：
 ${report}
 
+${ragNotice}
+
 `;
 
     try {
         const parts = convertContentParts([{ text: prompt }]);
-        return await generateWithRetry(parts, '事实核查专家', -1);
+        if (fileSearchStoreName) {
+            return await generateWithFileSearch(parts, '事实核查专家', fileSearchStoreName, -1, model);
+        }
+        return await generateWithRetry(parts, '事实核查专家', -1, model);
     } catch (error) {
         console.error('Error in bias detection:', error);
         return report; // Return original if bias detection fails
