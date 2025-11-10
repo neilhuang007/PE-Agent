@@ -1234,15 +1234,48 @@ async function processSelectedFiles(files) {
         generateBtn.textContent = '文件上传中...';
     }
 
-    // Regular file upload to Gemini
+    // File Search supported formats that may not work with regular Gemini Files API
+    const fileSearchOnlyFormats = [
+        '.docx', '.doc',  // Word documents
+        '.pptx', '.ppt',  // PowerPoint
+        '.xlsx', '.xls'   // Excel
+    ];
+
+    // Track files for File Search (all files will go here)
+    const filesForFileSearch = [];
+
+    // Regular file upload to Gemini (for PDF, images, etc.)
     for (let i = 0; i < files.length; i++) {
         const file = files[i];
         fileUploadStatus.innerHTML = `正在处理 ${file.name}...`;
 
+        // Check if this is a File Search-only format
+        const isFileSearchOnly = fileSearchOnlyFormats.some(ext =>
+            file.name.toLowerCase().endsWith(ext)
+        );
+
+        // Add to File Search tracking
+        filesForFileSearch.push(file);
+
+        if (isFileSearchOnly) {
+            // Skip regular upload for File Search-only formats
+            console.log(`${file.name} 将仅上传到 File Search Store (格式: ${file.type})`);
+
+            // Add placeholder to allUploadedFiles for tracking
+            allUploadedFiles.push({
+                uri: `filesearch_only_${Date.now()}_${i}`,
+                mimeType: file.type,
+                displayName: file.name,
+                fileSearchOnly: true // Mark as File Search only
+            });
+            continue;
+        }
+
+        // Try regular upload for supported formats (PDF, images, etc.)
         try {
             const uploadedFile = await uploadFileToGemini(file, getApiKey());
             allUploadedFiles.push(uploadedFile);
-            console.log(`成功上传: ${file.name} (${file.type})`);
+            console.log(`成功上传到 Gemini Files: ${file.name} (${file.type})`);
             console.log(`当前文件数组大小: ${allUploadedFiles.length}`);
         } catch (error) {
             console.error(`上传失败 ${file.name}:`, error);
@@ -1260,30 +1293,39 @@ async function processSelectedFiles(files) {
                 } catch (txtError) {
                     console.error(`TXT文件处理失败: ${file.name}`, txtError);
                 }
+            } else {
+                // For other failures, still track for File Search
+                console.log(`${file.name} 将尝试仅通过 File Search Store 处理`);
+                allUploadedFiles.push({
+                    uri: `filesearch_fallback_${Date.now()}_${i}`,
+                    mimeType: file.type,
+                    displayName: file.name,
+                    fileSearchOnly: true
+                });
             }
         }
     }
 
-    // Initialize File Search Store for RAG (create once, reuse for all files)
+    // Initialize File Search Store for RAG (create once for all files)
     try {
         const genAI = initializeGemini();
-        if (genAI && allUploadedFiles.length > 0 && !fileSearchStoreName) {
+        if (genAI && filesForFileSearch.length > 0 && !fileSearchStoreName) {
             fileUploadStatus.innerHTML = `正在创建文件搜索存储 (RAG)...`;
 
             // Create file search store
-            const store = await createFileSearchStore(genAI, `PE-Agent-${Date.now()}`);
+            const store = await createFileSearchStore(`PE-Agent-${Date.now()}`);
             fileSearchStoreName = store.name;
 
-            // Upload files to the store
-            fileUploadStatus.innerHTML = `正在上传文件到搜索存储...`;
-            const filesToUpload = Array.from(files).map((file, index) => ({
+            // Upload ALL files to the store (including .docx, .pptx, etc.)
+            fileUploadStatus.innerHTML = `正在上传 ${filesForFileSearch.length} 个文件到搜索存储...`;
+            const filesToUpload = filesForFileSearch.map((file, index) => ({
                 file: file,
                 displayName: file.name,
                 mimeType: file.type
             }));
 
-            await uploadToFileSearchStore(genAI, filesToUpload);
-            console.log('✅ 文件已上传到 File Search Store for RAG');
+            await uploadToFileSearchStore(fileSearchStoreName, filesToUpload);
+            console.log(`✅ ${filesForFileSearch.length} 个文件已上传到 File Search Store for RAG`);
         }
     } catch (error) {
         console.error('⚠️ File Search Store 初始化失败，将使用传统模式:', error);
