@@ -1194,13 +1194,24 @@ function updateFilesList() {
         filesList.innerHTML = '';
         return;
     }
-    
+
+    // Helper function to get file type label
+    const getFileTypeLabel = (file) => {
+        if (file.mimeType === 'text/plain') return 'TXT';
+        if (file.mimeType === 'application/pdf') return 'PDF';
+        if (file.mimeType === 'application/vnd.openxmlformats-officedocument.wordprocessingml.document') return 'DOCX';
+        if (file.displayName.toLowerCase().endsWith('.docx')) return 'DOCX';
+        if (file.displayName.toLowerCase().endsWith('.txt')) return 'TXT';
+        if (file.displayName.toLowerCase().endsWith('.pdf')) return 'PDF';
+        return 'FILE';
+    };
+
     filesList.innerHTML = `
         <h4>已上传文件 (${allUploadedFiles.length}):</h4>
         <ul style="margin: 10px 0; padding-left: 20px;">
             ${allUploadedFiles.map((file, index) => `
                 <li style="margin: 5px 0;">
-                    ${file.displayName} (${file.mimeType === 'text/plain' ? 'TXT' : 'PDF'})
+                    ${file.displayName} (${getFileTypeLabel(file)}${file.fileSearchOnly ? ' - File Search Store' : ''})
                     <button onclick="removeFile(${index})" style="margin-left: 10px; color: red; border: none; background: none; cursor: pointer;">✕</button>
                 </li>
             `).join('')}
@@ -1235,9 +1246,28 @@ async function processSelectedFiles(files) {
     }
 
     // Regular file upload to Gemini
+    // Note: DOCX files are not supported by the regular Files API, only by File Search Store
     for (let i = 0; i < files.length; i++) {
         const file = files[i];
         fileUploadStatus.innerHTML = `正在处理 ${file.name}...`;
+
+        // Check if file is a DOCX file
+        const isDocx = file.type === 'application/vnd.openxmlformats-officedocument.wordprocessingml.document' ||
+                       file.name.toLowerCase().endsWith('.docx');
+
+        if (isDocx) {
+            // DOCX files are not supported by regular Files API, skip to File Search Store
+            console.log(`📄 DOCX文件检测: ${file.name} - 将仅上传到 File Search Store`);
+            fileUploadStatus.innerHTML = `处理 DOCX 文件: ${file.name} (将上传到 File Search Store)`;
+            // Create a placeholder entry for the file that will be uploaded to File Search Store
+            allUploadedFiles.push({
+                uri: `file_search_only_${Date.now()}_${i}`,
+                mimeType: file.type,
+                displayName: file.name,
+                fileSearchOnly: true // Flag to indicate this file is only in File Search Store
+            });
+            continue;
+        }
 
         try {
             const uploadedFile = await uploadFileToGemini(file, getApiKey());
@@ -1265,9 +1295,10 @@ async function processSelectedFiles(files) {
     }
 
     // Initialize File Search Store for RAG (create once, reuse for all files)
+    // Note: File Search Store supports DOCX, PDF, TXT, JSON, and many other formats
     try {
         const genAI = initializeGemini();
-        if (genAI && allUploadedFiles.length > 0 && !fileSearchStoreName) {
+        if (genAI && files.length > 0 && !fileSearchStoreName) {
             fileUploadStatus.innerHTML = `正在创建文件搜索存储 (RAG)...`;
 
             // Create file search store
