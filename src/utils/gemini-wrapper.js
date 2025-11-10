@@ -209,3 +209,127 @@ export async function deleteFile(name) {
         throw new Error('Gemini client not initialized');
     await ai.files.delete({ name });
 }
+
+/**
+ * Create a File Search Store for RAG
+ */
+export async function createFileSearchStore(displayName = 'PE-Agent-Document-Store') {
+    if (!ai)
+        throw new Error('Gemini client not initialized');
+
+    console.log(`📦 Creating file search store: ${displayName}...`);
+
+    const createStoreOp = await ai.fileSearchStores.create({
+        config: {
+            displayName: displayName,
+            chunkingConfig: {
+                maxTokensPerChunk: 2048,
+                maxOverlapTokens: 256
+            }
+        }
+    });
+
+    // Wait for operation to complete
+    let store = createStoreOp;
+    if (createStoreOp.poll) {
+        console.log('⏳ Waiting for store creation to complete...');
+        store = await createStoreOp.poll();
+    }
+
+    console.log(`✅ File search store created: ${store.name}`);
+    return store;
+}
+
+/**
+ * Upload files to File Search Store
+ */
+export async function uploadToFileSearchStore(storeName, files) {
+    if (!ai)
+        throw new Error('Gemini client not initialized');
+
+    console.log(`📤 Uploading ${files.length} files to file search store...`);
+
+    const uploadedFiles = [];
+
+    for (let i = 0; i < files.length; i++) {
+        const file = files[i];
+        console.log(`  Uploading file ${i + 1}/${files.length}: ${file.displayName || file.name}...`);
+
+        const uploadOp = await ai.fileSearchStores.uploadToFileSearchStore({
+            fileSearchStoreName: storeName,
+            file: file.file || file,
+            config: {
+                displayName: file.displayName || file.name,
+                customMetadata: {
+                    uploadTime: new Date().toISOString(),
+                    fileType: file.mimeType || file.type
+                }
+            }
+        });
+
+        // Wait for upload to complete
+        let uploadedFile = uploadOp;
+        if (uploadOp.poll) {
+            uploadedFile = await uploadOp.poll();
+        }
+
+        uploadedFiles.push({
+            name: uploadedFile.name,
+            displayName: file.displayName || file.name,
+            uri: uploadedFile.uri,
+            state: uploadedFile.state
+        });
+
+        console.log(`  ✅ Uploaded: ${file.displayName || file.name}`);
+    }
+
+    console.log(`✅ All ${files.length} files uploaded to file search store`);
+    return uploadedFiles;
+}
+
+/**
+ * Generate content with File Search RAG
+ */
+export async function generateWithFileSearch(contents, systemPrompt, storeName, thinkingBudget = -1, model = 'gemini-2.5-pro') {
+    if (useProxy && proxyConfig) {
+        // For proxy mode, we need to manually construct the request with file search
+        throw new Error('File Search is not yet supported in proxy mode');
+    }
+
+    if (!ai)
+        throw new Error('Gemini client not initialized');
+
+    console.log('🔍 Generating with file search RAG...');
+
+    const config = {
+        thinkingConfig: { thinkingBudget },
+        systemInstruction: systemPrompt ? [{ text: systemPrompt }] : undefined,
+        tools: [{
+            fileSearch: {
+                fileSearchStoreNames: [storeName]
+            }
+        }]
+    };
+
+    const response = await ai.models.generateContentStream({ model, config, contents });
+
+    let text = '';
+    for await (const chunk of response) {
+        text += chunk.text;
+    }
+
+    console.log('✅ Generated response with file search');
+    return text;
+}
+
+/**
+ * Delete a File Search Store
+ */
+export async function deleteFileSearchStore(storeName) {
+    if (!ai)
+        throw new Error('Gemini client not initialized');
+
+    console.log(`🗑️  Deleting file search store: ${storeName}...`);
+    await ai.fileSearchStores.delete({ name: storeName });
+    console.log('✅ File search store deleted');
+}

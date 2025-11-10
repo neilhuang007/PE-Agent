@@ -1,5 +1,5 @@
 import { GoogleGenerativeAI } from 'https://esm.run/@google/generative-ai';
-import { initGeminiClient, generateWithRetry, convertContentParts } from './src/utils/gemini-wrapper.js';
+import { initGeminiClient, generateWithRetry, convertContentParts, createFileSearchStore, uploadToFileSearchStore, deleteFileSearchStore } from './src/utils/gemini-wrapper.js';
 import { uploadFile, deleteFile } from './src/utils/gemini-wrapper.js';
 import { 
     deepExtractChunk, 
@@ -15,13 +15,14 @@ import {
 } from './src/agents/fast-agents.js';
 import { detectAndRemoveBias } from './src/agents/bias-detection-agent.js';
 import { orchestrateMasterSubAgentSystem } from './master-subagent-system.js';
-import { chunkTranscript, updateProgress, getApiKey, saveApiKey, downloadReport, assembleRawDraft } from './src/utils/utils.js';
+import { chunkTranscript, updateProgress, getApiKey, saveApiKey, downloadReport, downloadReportAsWord, assembleRawDraft } from './src/utils/utils.js';
 import { finalReportFormatter, quickFinalFormatter, formatForDisplay } from './src/agents/final-formatter.js';
 import { marked } from 'https://cdn.jsdelivr.net/npm/marked@11.2.0/+esm';
 
 let currentReport = '';
 let allUploadedFiles = []; // Store all uploaded files across multiple sessions
 let isUploadInProgress = false; // Track upload status
+let fileSearchStoreName = null; // Store the file search store name for RAG
 
 // Progress stepper data storage with sub-cards support
 let stepperData = {
@@ -883,7 +884,7 @@ async function generateReport(e) {
             extractedChunks = [];
             const extractionPromises = chunks.map(async (chunk, i) => {
                 try {
-                    const result = await deepExtractChunk(chunk, i, transcript, combinedAnalyses, allUploadedFiles, model);
+                    const result = await deepExtractChunk(chunk, i, transcript, combinedAnalyses, allUploadedFiles, model, fileSearchStoreName);
                     extractedChunks[i] = result;
                     
                     // Add chunk result immediately when it completes
@@ -1045,13 +1046,13 @@ async function generateReport(e) {
             updateProgress(80, '质量控制...');
             try {
                 // Citation Verification with all data sources
-                const citationVerification = await verifyCitations(localReport, transcript, combinedAnalyses, fileSummaries, allUploadedFiles, model);
+                const citationVerification = await verifyCitations(localReport, transcript, combinedAnalyses, fileSummaries, allUploadedFiles, model, fileSearchStoreName);
                 if (!citationVerification.verified && citationVerification.issues?.length > 0) {
                     console.warn('引用验证发现问题:', citationVerification.issues);
                 }
 
                 // Excellence Validation with comprehensive data
-                const excellenceValidation = await validateExcellence(localReport, transcript, combinedAnalyses, allUploadedFiles, model);
+                const excellenceValidation = await validateExcellence(localReport, transcript, combinedAnalyses, allUploadedFiles, model, fileSearchStoreName);
                 if (excellenceValidation.score < 80) {
                     console.warn('质量评分较低:', excellenceValidation.score);
                 }
@@ -1159,7 +1160,7 @@ async function generateReport(e) {
         // Format for display with proper HTML
         const htmlFormattedReport = formatForDisplay(reportWithTerms);
         reportOutput.innerHTML = htmlFormattedReport;
-        downloadBtn.style.display = 'block';
+        document.getElementById('downloadBtnContainer').style.display = 'flex';
         
         // Clean up uploaded files after 10 minutes (increased time for multiple sessions)
         if (allUploadedFiles.length > 0) {
@@ -1225,18 +1226,19 @@ window.removeFile = async function (index) {
 async function processSelectedFiles(files) {
     const fileUploadStatus = document.getElementById('fileUploadStatus');
     const generateBtn = document.getElementById('generateBtn');
-    
+
     // Set upload in progress and disable generate button
     isUploadInProgress = true;
     if (generateBtn) {
         generateBtn.disabled = true;
         generateBtn.textContent = '文件上传中...';
     }
-    
+
+    // Regular file upload to Gemini
     for (let i = 0; i < files.length; i++) {
         const file = files[i];
         fileUploadStatus.innerHTML = `正在处理 ${file.name}...`;
-        
+
         try {
             const uploadedFile = await uploadFileToGemini(file, getApiKey());
             allUploadedFiles.push(uploadedFile);
@@ -1261,17 +1263,45 @@ async function processSelectedFiles(files) {
             }
         }
     }
-    
+
+    // Initialize File Search Store for RAG (create once, reuse for all files)
+    try {
+        const genAI = initializeGemini();
+        if (genAI && allUploadedFiles.length > 0 && !fileSearchStoreName) {
+            fileUploadStatus.innerHTML = `正在创建文件搜索存储 (RAG)...`;
+
+            // Create file search store
+            const store = await createFileSearchStore(genAI, `PE-Agent-${Date.now()}`);
+            fileSearchStoreName = store.name;
+
+            // Upload files to the store
+            fileUploadStatus.innerHTML = `正在上传文件到搜索存储...`;
+            const filesToUpload = Array.from(files).map((file, index) => ({
+                file: file,
+                displayName: file.name,
+                mimeType: file.type
+            }));
+
+            await uploadToFileSearchStore(genAI, filesToUpload);
+            console.log('✅ 文件已上传到 File Search Store for RAG');
+        }
+    } catch (error) {
+        console.error('⚠️ File Search Store 初始化失败，将使用传统模式:', error);
+        // Continue with traditional mode if File Search fails
+        fileSearchStoreName = null;
+    }
+
     updateFilesList();
-    
+
     // Mark upload as complete and re-enable generate button
     isUploadInProgress = false;
     if (generateBtn) {
         generateBtn.disabled = false;
         generateBtn.textContent = '生成报告';
     }
-    
-    fileUploadStatus.innerHTML = `已处理 ${files.length} 个文件 - 可以开始生成报告`;
+
+    const ragStatus = fileSearchStoreName ? '(RAG模式已启用)' : '(传统模式)';
+    fileUploadStatus.innerHTML = `已处理 ${files.length} 个文件 ${ragStatus} - 可以开始生成报告`;
     setTimeout(() => {
         fileUploadStatus.innerHTML = '';
     }, 3000);
@@ -1646,6 +1676,9 @@ document.addEventListener('DOMContentLoaded', () => {
     document.getElementById('reportForm').addEventListener('submit', generateReport);
     document.getElementById('downloadBtn').addEventListener('click', () => {
         downloadReport(currentReport);
+    });
+    document.getElementById('downloadWordBtn').addEventListener('click', async () => {
+        await downloadReportAsWord(currentReport);
     });
     document.getElementById('addMoreFiles').addEventListener('click', addMoreFiles);
     
