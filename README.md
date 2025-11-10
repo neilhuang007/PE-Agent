@@ -51,4 +51,4 @@ The generated reports include:
 
 ## Example Report
 
-See `汉邦激光访谈纪要.docx` for an example of the report format this tool generates.
+The tool generates professional PE interview assessment reports following Chinese business standards with proper hierarchical formatting.
