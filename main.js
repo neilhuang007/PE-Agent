@@ -1,17 +1,15 @@
 import { GoogleGenerativeAI } from 'https://esm.run/@google/generative-ai';
-import { initGeminiClient, generateWithRetry, convertContentParts, createFileSearchStore, uploadToFileSearchStore, deleteFileSearchStore } from './src/utils/gemini-wrapper.js';
+import { initGeminiClient, generateWithRetry, convertContentParts, createFileSearchStore, uploadToFileSearchStore } from './src/utils/gemini-wrapper.js';
 import { uploadFile, deleteFile } from './src/utils/gemini-wrapper.js';
-import { 
-    deepExtractChunk, 
+import {
+    deepExtractChunk,
     verifyCitations,
-    validateExcellence,
     comprehensiveBPAnalysis
 } from './src/agents/enhanced-agents.js';
-import { 
-    fastExtractChunk, 
-    fastComposeReport, 
-    fastQualityCheck, 
-    fastFormatReport 
+import {
+    fastExtractChunk,
+    fastComposeReport,
+    fastFormatReport
 } from './src/agents/fast-agents.js';
 import { detectAndRemoveBias } from './src/agents/bias-detection-agent.js';
 import { orchestrateMasterSubAgentSystem } from './master-subagent-system.js';
@@ -23,6 +21,7 @@ let currentReport = '';
 let allUploadedFiles = []; // Store all uploaded files across multiple sessions
 let isUploadInProgress = false; // Track upload status
 let fileSearchStoreName = null; // Store the file search store name for RAG
+let lastTranscriptRagContent = null; // Cache last uploaded transcript content to avoid duplicate RAG uploads
 
 // Progress stepper data storage with sub-cards support
 let stepperData = {
@@ -149,6 +148,19 @@ function resetStepper() {
         const stepNumber = steps.indexOf(stepId) + 1;
         circle.textContent = stepNumber;
     });
+}
+
+function buildWorkflowOptimizationSummary(ragEnabled, uploadedCount) {
+    const optimizations = [
+        '统一使用 Google 文件 API 上传并实时写入 File Search RAG，确保所有代理拥有一致的数据视图',
+        '访谈内容以完整上下文进入 RAG，无需切分片段，减少信息碎片化导致的遗漏',
+        '移除最终评分代理，改为专注引用核对与偏向性治理，缩短质量控制路径',
+        '增强任务直接从 RAG 获取补充证据，替换时保持原段落结构以避免格式漂移',
+        '质量流程输出结构化优化列表，便于持续迭代并在需要时复用'
+    ];
+
+    const prefix = `Workflow 优化清单 (RAG${ragEnabled ? '已启用' : '未启用'}, 文档数: ${uploadedCount})`;
+    return `${prefix}:\n${optimizations.map((item, index) => `${index + 1}. ${item}`).join('\n')}`;
 }
 
 // Step details modal functions
@@ -627,9 +639,52 @@ async function uploadFileToGemini(file, apiKey) {
 }
 
 
-async function deleteFileFromGemini(name, apiKey) {
+async function deleteFileFromGemini(name) {
     await deleteFile(name);
     return true;
+}
+
+
+async function ensureTranscriptInRag(transcript, companyName) {
+    const trimmedTranscript = (transcript || '').trim();
+    if (!trimmedTranscript) {
+        return;
+    }
+
+    try {
+        if (!fileSearchStoreName) {
+            const store = await createFileSearchStore(`PE-Agent-${Date.now()}`);
+            fileSearchStoreName = store.name;
+        }
+
+        if (lastTranscriptRagContent === trimmedTranscript) {
+            return;
+        }
+
+        const safeCompanyName = (companyName || '').trim() || '未命名公司';
+        const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
+        const displayName = `${safeCompanyName}-访谈记录-${timestamp}.txt`;
+
+        const transcriptFilePayload = {
+            file: typeof File !== 'undefined'
+                ? new File([trimmedTranscript], displayName, { type: 'text/plain' })
+                : new Blob([trimmedTranscript], { type: 'text/plain' }),
+            displayName,
+            mimeType: 'text/plain'
+        };
+
+        // For the Blob fallback, provide a name hint expected by the API
+        if (!(transcriptFilePayload.file instanceof File) && !transcriptFilePayload.file.name) {
+            transcriptFilePayload.file = Object.assign(transcriptFilePayload.file, { name: displayName });
+        }
+
+        console.log('🗄️ Uploading transcript to File Search store for RAG access...');
+        await uploadToFileSearchStore(fileSearchStoreName, [transcriptFilePayload]);
+        lastTranscriptRagContent = trimmedTranscript;
+        console.log('✅ Transcript synced to File Search store');
+    } catch (error) {
+        console.error('⚠️ Transcript upload to File Search failed, continuing without transcript RAG:', error);
+    }
 }
 
 
@@ -711,6 +766,9 @@ async function generateReport(e) {
         
         // Step 1: Use already uploaded files (files are processed immediately when selected)
         updateProgress(10, `使用已上传的 ${allUploadedFiles.length} 个文档开始分析...`);
+
+        // Ensure the full interview transcript is also available to RAG consumers
+        await ensureTranscriptInRag(transcript, companyName);
         
         // Step 2: Document Analysis FIRST (wait for completion before chunk extraction)
         updateStepper('step-document-analysis', 'active');
@@ -727,7 +785,7 @@ async function generateReport(e) {
                     console.log(`文件 ${fileIndex + 1} 分析完成: ${fileName} - ${analysis.length} 字符`);
                 };
                 
-                const bpResult = await comprehensiveBPAnalysis(allUploadedFiles, model, genAI, fileAnalysisCallback);
+                const bpResult = await comprehensiveBPAnalysis(allUploadedFiles, model, genAI, fileAnalysisCallback, fileSearchStoreName);
                 combinedAnalyses = bpResult.combinedAnalyses;
                 fileSummaries = bpResult.fileSummaries;
                 updateProgress(25, `文档分析完成 - 提取了 ${combinedAnalyses.length} 字符的结构化数据`);
@@ -754,8 +812,10 @@ async function generateReport(e) {
         updateStepper('step-chunk-extraction', 'active');
         updateProgress(30, isSpeedMode ? '快速模式：优化处理流程...' : '开始深度分析访谈内容...');
         const chunks = chunkTranscript(transcript);
-        updateProgress(35, `已将访谈内容分成${chunks.length}个片段`,
-            chunks.map((c, i) => `片段${i+1}: ${c}`).join('<br>'));
+        const chunkDetailMessage = chunks.length > 0
+            ? `RAG上下文长度：${chunks[0].length} 字符`
+            : '无有效访谈内容，跳过片段处理';
+        updateProgress(35, '访谈内容已作为单一RAG上下文载入', chunkDetailMessage);
         
         let extractedChunks, organizedInfo, localReport, architecturedInfo, rawDraft;
         
@@ -777,7 +837,7 @@ async function generateReport(e) {
             extractedChunks = [];
             const fastExtractionPromises = chunks.map(async (chunk, i) => {
                 try {
-                    const result = await fastExtractChunk(chunk, i, combinedAnalyses, fastModel);
+                    const result = await fastExtractChunk(chunk, i, combinedAnalyses, fastModel, fileSearchStoreName);
                     extractedChunks[i] = result;
                     
                     // Add chunk result immediately when it completes
@@ -814,7 +874,7 @@ async function generateReport(e) {
             
             // Generate report directly from raw data (no intermediate organization step)
             const rawData = extractedChunks.join('\n\n') + (combinedAnalyses ? `\n\n${combinedAnalyses}` : '');
-            localReport = await fastComposeReport(rawData, companyName, fastModel);
+            localReport = await fastComposeReport(rawData, companyName, fastModel, fileSearchStoreName);
             
             // Add report generation details as sub-card
             const reportGenData = `快速报告生成:\n公司名称: ${companyName}\n原始数据长度: ${rawData.length} 字符\n生成的报告长度: ${localReport.length} 字符\n\n生成的报告:\n${localReport}`;
@@ -832,49 +892,49 @@ async function generateReport(e) {
                 displayInitialDraft(localReport, initialDraftDiv);
             }
             
-            // Fast quality and formatting pipeline (no subagent enhancement for speed)
+            // Fast quality optimization and formatting pipeline (no scoring agents)
             updateStepper('step-enhancement', 'active');
-            updateProgress(85, '快速质量检查和格式化...');
-            const [qualityResult, formattedReport] = await Promise.all([
-                fastQualityCheck(localReport, transcript, combinedAnalyses, fastModel),
-                detectAndRemoveBias(localReport, fastModel).then(debiased => 
-                    fastFormatReport(debiased, fastModel)
-                )
-            ]);
-            
-            // Add quality check details as sub-card
-            const qualityData = `快速质量检查:\n质量评分: ${qualityResult?.score || 'N/A'}/100\n检查项目: 内容完整性、引用准确性\n状态: 快速模式，跳过深度增强\n\n质量报告详情:\n${JSON.stringify(qualityResult, null, 2)}`;
+            updateProgress(85, '快速质量优化和格式化...');
+
+            const debiasedReport = await detectAndRemoveBias(localReport, fastModel, fileSearchStoreName);
+            const formattedReport = await fastFormatReport(debiasedReport || localReport, fastModel, fileSearchStoreName);
+
+            // Add quality optimization details as sub-card
+            const qualityData = `快速质量优化:\n动作: RAG对齐校验 + 偏向性移除\n评分机制: 已移除数值评分，仅关注事实一致性\n状态: 快速模式，直接输出可用报告`;
             updateStepper('step-enhancement', 'active', '', qualityData);
-            
+
             // Add bias detection details as sub-card
             const biasData = `偏向性检测:\n原始报告长度: ${localReport.length} 字符\n检测结果: 已检查并移除潜在偏向性内容\n处理模式: 快速模式`;
             updateStepper('step-enhancement', 'active', '', biasData);
-            
-            updateStepper('step-enhancement', 'completed', `快速模式跳过深度增强，质量评分: ${qualityResult?.score || 'N/A'}/100`);
-            
+
+            updateStepper('step-enhancement', 'completed', '快速模式跳过深度增强，已完成质量优化');
+
             if (formattedReport && typeof formattedReport === 'string') {
                 localReport = formattedReport;
             }
-            
+
             // Add delay to show this step completion before moving to next
             await new Promise(resolve => setTimeout(resolve, 500));
-            
+
             // Final formatting for fast mode
             updateStepper('step-finalization', 'active');
             updateProgress(95, '最终格式化...');
-            const finalFormattedReport = await quickFinalFormatter(localReport, fastModel);
-            
+            const finalFormattedReport = await quickFinalFormatter(localReport, fastModel, fileSearchStoreName);
+
             // Add final formatting details as sub-card
             const finalData = `最终格式化 (快速模式):\n格式化前长度: ${localReport.length} 字符\n格式化后长度: ${finalFormattedReport?.length || localReport.length} 字符\n处理类型: 快速最终格式化\n\n格式化结果预览:\n${(finalFormattedReport || localReport)}`;
             updateStepper('step-finalization', 'active', '', finalData);
-            
+
+            const optimizationSummary = buildWorkflowOptimizationSummary(Boolean(fileSearchStoreName), allUploadedFiles.length);
+            updateStepper('step-finalization', 'active', '', optimizationSummary);
+
             if (finalFormattedReport && typeof finalFormattedReport === 'string') {
                 localReport = finalFormattedReport;
             }
             updateStepper('step-finalization', 'completed', `最终格式化完成，报告长度: ${localReport.length} 字符`);
-            
+
             architecturedInfo = organizedInfo; // Set for technical terms
-            updateProgress(98, `快速模式完成 - 质量评分: ${qualityResult?.score || 'N/A'}/100`);
+            updateProgress(98, '快速模式完成 - 已整合RAG上下文并移除评分环节');
             
         } else {
             // ENHANCED MODE: Full quality pipeline with dynamic analysis
@@ -919,7 +979,7 @@ async function generateReport(e) {
             updateStepper('step-report-generation', 'active');
             updateProgress(58, '直接生成报告...');
             rawDraft = assembleRawDraft(extractedChunks, combinedAnalyses);
-            localReport = await finalReportFormatter(rawDraft, model);
+            localReport = await finalReportFormatter(rawDraft, model, fileSearchStoreName);
             
             // Add report generation details as sub-card
             const reportGenData = `深度报告生成:\n原始草稿长度: ${rawDraft.length} 字符\n格式化后报告长度: ${localReport.length} 字符\n\n生成的报告:\n${localReport}`;
@@ -1021,7 +1081,7 @@ async function generateReport(e) {
                 }
             };
             
-            const enhancedReport = await orchestrateMasterSubAgentSystem(localReport, transcript, allUploadedFiles, model, visualizationCallback);
+            const enhancedReport = await orchestrateMasterSubAgentSystem(localReport, transcript, allUploadedFiles, model, visualizationCallback, fileSearchStoreName);
             
             // Remove spinner from progress text
             removeSpinnerFromProgressText();
@@ -1051,17 +1111,15 @@ async function generateReport(e) {
                     console.warn('引用验证发现问题:', citationVerification.issues);
                 }
 
-                // Excellence Validation with comprehensive data
-                const excellenceValidation = await validateExcellence(localReport, transcript, combinedAnalyses, allUploadedFiles, model, fileSearchStoreName);
-                if (excellenceValidation.score < 80) {
-                    console.warn('质量评分较低:', excellenceValidation.score);
-                }
-                
+                const issuesText = citationVerification.issues?.length > 0
+                    ? `发现的问题:\n${citationVerification.issues.join('\n')}\n`
+                    : '未发现问题\n';
+
                 // Add quality control details as sub-card for finalization step
-                const qualityControlData = `质量控制验证:\n引用验证状态: ${citationVerification.verified ? '通过' : '存在问题'}\n${citationVerification.issues?.length > 0 ? '发现的问题:\n' + citationVerification.issues.join('\n') + '\n' : ''}卓越性评分: ${excellenceValidation.score || 'N/A'}/100\n验证数据源: ${allUploadedFiles.length} 个文件\n转录文本长度: ${transcript.length} 字符`;
+                const qualityControlData = `质量控制验证:\n引用验证状态: ${citationVerification.verified ? '通过' : '存在问题'}\n${issuesText}RAG 文档数量: ${allUploadedFiles.length} 个\n转录文本长度: ${transcript.length} 字符\n评分机制: 已移除最终打分，仅保留事实一致性检查`;
                 updateStepper('step-finalization', 'active', '', qualityControlData);
-                
-                updateProgress(85, `验证完成 - 质量评分: ${excellenceValidation.score || 'N/A'}/100`);
+
+                updateProgress(85, '验证完成 - 已同步RAG引用检查');
             } catch (error) {
                 console.error('验证过程出错:', error);
                 updateProgress(85, '验证过程出错，继续处理');
@@ -1074,7 +1132,7 @@ async function generateReport(e) {
             // Bias Detection and Professional Formatting
             updateProgress(90, '正在进行偏向性检测和专业格式化...');
             try {
-                const debiasedReport = await detectAndRemoveBias(localReport, model);
+                const debiasedReport = await detectAndRemoveBias(localReport, model, fileSearchStoreName);
                 
                 // Add bias detection details as sub-card
                 const biasDetectionData = `偏向性检测 (深度模式):\n原始报告长度: ${localReport.length} 字符\n处理后长度: ${debiasedReport?.length || localReport.length} 字符\n检测状态: ${debiasedReport ? '成功检测并移除偏向性' : '检测失败，保持原报告'}\n处理模式: 深度分析模式`;
@@ -1099,12 +1157,15 @@ async function generateReport(e) {
             // Final professional formatting
             updateProgress(95, '最终专业格式化...');
             try {
-                const finalFormattedReport = await finalReportFormatter(localReport, model);
-                
+                const finalFormattedReport = await finalReportFormatter(localReport, model, fileSearchStoreName);
+
                 // Add final formatting details as sub-card
                 const finalFormattingData = `最终专业格式化 (深度模式):\n格式化前长度: ${localReport.length} 字符\n格式化后长度: ${finalFormattedReport?.length || localReport.length} 字符\n格式化状态: ${finalFormattedReport ? '成功完成专业格式化' : '格式化失败，保持原报告'}\n处理类型: 深度专业格式化\n\n最终报告:\n${finalFormattedReport || localReport}`;
                 updateStepper('step-finalization', 'active', '', finalFormattingData);
-                
+
+                const optimizationSummary = buildWorkflowOptimizationSummary(Boolean(fileSearchStoreName), allUploadedFiles.length);
+                updateStepper('step-finalization', 'active', '', optimizationSummary);
+
                 if (finalFormattedReport && typeof finalFormattedReport === 'string') {
                     localReport = finalFormattedReport;
                 }
@@ -1166,8 +1227,8 @@ async function generateReport(e) {
         if (allUploadedFiles.length > 0) {
             setTimeout(async () => {
                 for (const file of allUploadedFiles) {
-                    if (file.uri && !file.uri.startsWith('local_')) {
-                        await deleteFileFromGemini(file.uri, getApiKey());
+                    if (file.name && !file.uri?.startsWith('local_')) {
+                        await deleteFileFromGemini(file.name);
                     }
                 }
                 console.log('已清理上传的文件');
@@ -1224,7 +1285,7 @@ window.removeFile = async function (index) {
     const file = allUploadedFiles[index];
     if (file && file.uri && !file.uri.startsWith('local_') && file.name) {
         try {
-            await deleteFileFromGemini(file.name, getApiKey());
+            await deleteFileFromGemini(file.name);
         } catch (error) {
             console.error('Failed to delete file:', error);
         }
@@ -1245,38 +1306,38 @@ async function processSelectedFiles(files) {
         generateBtn.textContent = '文件上传中...';
     }
 
-    // Regular file upload to Gemini
-    // Note: DOCX files are not supported by the regular Files API, only by File Search Store
-    for (let i = 0; i < files.length; i++) {
-        const file = files[i];
-        fileUploadStatus.innerHTML = `正在处理 ${file.name}...`;
+    const selectedFiles = Array.from(files || []);
+    const apiKey = getApiKey();
+    const geminiClient = initializeGemini();
 
-        // Check if file is a DOCX file
-        const isDocx = file.type === 'application/vnd.openxmlformats-officedocument.wordprocessingml.document' ||
-                       file.name.toLowerCase().endsWith('.docx');
-
-        if (isDocx) {
-            // DOCX files are not supported by regular Files API, skip to File Search Store
-            console.log(`📄 DOCX文件检测: ${file.name} - 将仅上传到 File Search Store`);
-            fileUploadStatus.innerHTML = `处理 DOCX 文件: ${file.name} (将上传到 File Search Store)`;
-            // Create a placeholder entry for the file that will be uploaded to File Search Store
-            allUploadedFiles.push({
-                uri: `file_search_only_${Date.now()}_${i}`,
-                mimeType: file.type,
-                displayName: file.name,
-                fileSearchOnly: true // Flag to indicate this file is only in File Search Store
-            });
-            continue;
+    if (!geminiClient) {
+        isUploadInProgress = false;
+        if (generateBtn) {
+            generateBtn.disabled = false;
+            generateBtn.textContent = '生成报告';
         }
+        fileUploadStatus.innerHTML = '请先输入有效的 Gemini API Key';
+        return;
+    }
+
+    const filesForRagUpload = [];
+
+    for (let i = 0; i < selectedFiles.length; i++) {
+        const file = selectedFiles[i];
+        fileUploadStatus.innerHTML = `通过 Google File API 上传 ${file.name}...`;
 
         try {
-            const uploadedFile = await uploadFileToGemini(file, getApiKey());
+            const uploadedFile = await uploadFileToGemini(file, apiKey);
             allUploadedFiles.push(uploadedFile);
+            filesForRagUpload.push({
+                file,
+                displayName: file.name,
+                mimeType: file.type
+            });
             console.log(`成功上传: ${file.name} (${file.type})`);
             console.log(`当前文件数组大小: ${allUploadedFiles.length}`);
         } catch (error) {
             console.error(`上传失败 ${file.name}:`, error);
-            // For TXT files, we could read them directly as fallback
             if (file.type === 'text/plain' || file.name.toLowerCase().endsWith('.txt')) {
                 try {
                     const text = await file.text();
@@ -1284,7 +1345,8 @@ async function processSelectedFiles(files) {
                         uri: `local_txt_${Date.now()}`,
                         mimeType: 'text/plain',
                         displayName: file.name,
-                        content: text // Store content directly for local TXT files
+                        name: null,
+                        content: text
                     });
                     console.log(`TXT文件本地处理: ${file.name}`);
                 } catch (txtError) {
@@ -1294,32 +1356,24 @@ async function processSelectedFiles(files) {
         }
     }
 
-    // Initialize File Search Store for RAG (create once, reuse for all files)
-    // Note: File Search Store supports DOCX, PDF, TXT, JSON, and many other formats
     try {
-        const genAI = initializeGemini();
-        if (genAI && files.length > 0 && !fileSearchStoreName) {
-            fileUploadStatus.innerHTML = `正在创建文件搜索存储 (RAG)...`;
+        if (filesForRagUpload.length > 0) {
+            if (!fileSearchStoreName) {
+                fileUploadStatus.innerHTML = '正在创建文件搜索存储 (RAG)...';
+                const store = await createFileSearchStore(`PE-Agent-${Date.now()}`);
+                fileSearchStoreName = store.name;
+            } else {
+                fileUploadStatus.innerHTML = '正在更新文件搜索存储 (RAG)...';
+            }
 
-            // Create file search store
-            const store = await createFileSearchStore(genAI, `PE-Agent-${Date.now()}`);
-            fileSearchStoreName = store.name;
-
-            // Upload files to the store
-            fileUploadStatus.innerHTML = `正在上传文件到搜索存储...`;
-            const filesToUpload = Array.from(files).map((file, index) => ({
-                file: file,
-                displayName: file.name,
-                mimeType: file.type
-            }));
-
-            await uploadToFileSearchStore(genAI, filesToUpload);
+            fileUploadStatus.innerHTML = '正在将文件写入 File Search RAG...';
+            await uploadToFileSearchStore(fileSearchStoreName, filesForRagUpload);
             console.log('✅ 文件已上传到 File Search Store for RAG');
         }
     } catch (error) {
         console.error('⚠️ File Search Store 初始化失败，将使用传统模式:', error);
-        // Continue with traditional mode if File Search fails
         fileSearchStoreName = null;
+        lastTranscriptRagContent = null;
     }
 
     updateFilesList();
@@ -1332,7 +1386,7 @@ async function processSelectedFiles(files) {
     }
 
     const ragStatus = fileSearchStoreName ? '(RAG模式已启用)' : '(传统模式)';
-    fileUploadStatus.innerHTML = `已处理 ${files.length} 个文件 ${ragStatus} - 可以开始生成报告`;
+    fileUploadStatus.innerHTML = `已处理 ${selectedFiles.length} 个文件 ${ragStatus} - 可以开始生成报告`;
     setTimeout(() => {
         fileUploadStatus.innerHTML = '';
     }, 3000);

@@ -1,20 +1,19 @@
 // Utility functions
 
 // Chunk transcript into smaller pieces - optimized for parallel processing
-export function chunkTranscript(transcript, maxChunks = 6) {
-    const paragraphs = transcript.split(/\n\n+/).filter(p => p.trim());
-    
-    // Optimize chunk size based on content length and desired parallelism
-    const optimalChunkSize = Math.max(2, Math.ceil(paragraphs.length / maxChunks));
-    const chunks = [];
-    
-    for (let i = 0; i < paragraphs.length; i += optimalChunkSize) {
-        chunks.push(paragraphs.slice(i, i + optimalChunkSize).join('\n\n'));
+// With unified RAG context, we keep the transcript intact to preserve nuance
+export function chunkTranscript(transcript) {
+    if (!transcript || typeof transcript !== 'string') {
+        return [];
     }
-    
-    // chunks.length should already be <= maxChunks based on optimalChunkSize
-    // Return all chunks so no content is dropped
-    return chunks;
+
+    const cleaned = transcript.trim();
+    if (!cleaned) {
+        return [];
+    }
+
+    // Return the full transcript as a single chunk so RAG has the complete context
+    return [cleaned];
 }
 
 // Update progress UI

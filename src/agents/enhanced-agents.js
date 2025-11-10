@@ -23,7 +23,7 @@ async function loadEnhancedPrompts() {
 
 
 // Enhanced Agent 10: Per-File Business Plan Analyzer
-async function analyzeIndividualFile(file, index, model, genAI) {
+async function analyzeIndividualFile(file, index, model, genAI, fileSearchStoreName = null) {
     console.log(`🔍 开始分析文档 ${index + 1}: ${file.displayName}`);
     try {
         const prompts = await loadEnhancedPrompts();
@@ -46,14 +46,15 @@ async function analyzeIndividualFile(file, index, model, genAI) {
             });
         }
         
-        // Use the new TypeScript wrapper if genAI is available, otherwise fall back to old method
+        // Use File Search RAG when available so every enhanced pass references the unified corpus
+        const convertedParts = convertContentParts(contentParts);
         let result;
-        if (genAI) {
-            const convertedParts = convertContentParts(contentParts);
-            result = await generateWithRetry(convertedParts, filePrompt.role, -1); // Use dynamic thinking
+        if (fileSearchStoreName) {
+            console.log(`📚 Using File Search RAG for per-file分析: ${file.displayName}`);
+            result = await generateWithFileSearch(convertedParts, filePrompt.role, fileSearchStoreName, -1, model);
         } else {
-            const convertedParts = convertContentParts(contentParts);
-            result = await generateWithRetry(convertedParts, filePrompt.role, -1);
+            // Fall back to standard generation when RAG is unavailable
+            result = await generateWithRetry(convertedParts, filePrompt.role, -1, model);
         }
         
         console.log(`✅ 文档 ${file.displayName} 分析成功 - 提取长度: ${result?.length || 0} 字符`);
@@ -78,7 +79,7 @@ async function analyzeIndividualFile(file, index, model, genAI) {
 }
 
 // Simplified Per-File Analysis Only
-export async function comprehensiveBPAnalysis(fileUris, model, genAI = null, progressCallback = null) {
+export async function comprehensiveBPAnalysis(fileUris, model, genAI = null, progressCallback = null, fileSearchStoreName = null) {
     if (!fileUris || fileUris.length === 0) {
         return { combinedAnalyses: '', fileSummaries: [] };
     }
@@ -89,7 +90,7 @@ export async function comprehensiveBPAnalysis(fileUris, model, genAI = null, pro
         // Analyze each file individually in parallel with real-time updates
         const individualAnalyses = [];
         const fileAnalysisPromises = fileUris.map(async (file, index) => {
-            const result = await analyzeIndividualFile(file, index, model, genAI);
+            const result = await analyzeIndividualFile(file, index, model, genAI, fileSearchStoreName);
             individualAnalyses[index] = result;
             
             // Call progress callback immediately when file completes
@@ -145,7 +146,7 @@ Critical: ${extractPrompt.critical}
 访谈片段 ${index + 1}:
 ${chunk}
 
-请从已上传的商业计划书文档中检索相关信息，以深度理解和交叉验证访谈内容。
+所有访谈原文和商业计划书材料均已写入统一的 File Search 存储，请检索相关证据来补全和验证信息。
 
 ${extractPrompt.outputFormat}`;
 
@@ -354,113 +355,5 @@ ${transcript}` }
         return { verified: false, error: error.message };
     }
 }
-
-
-// Enhanced Agent 5: Excellence Validator (RAG-optimized)
-export async function validateExcellence(report, transcript, combinedAnalyses, fileUris, model, fileSearchStoreName = null) {
-    try {
-        const prompts = await loadEnhancedPrompts();
-        const validatePrompt = prompts.validateExcellence;
-
-        if (!validatePrompt) {
-            console.warn('Validate prompt not found, using fallback');
-            return { score: 85, pass: true };
-        }
-
-        // Use File Search RAG if available
-        if (fileSearchStoreName) {
-            console.log('🔍 Using File Search RAG for excellence validation');
-
-            const prompt = `评估标准：
-${validatePrompt.criteria.map((criteria, i) => `${i + 1}. ${criteria}`).join('\n')}
-
-评分系统：
-${validatePrompt.outputFormat}
-
-报告内容:
-${report}
-
-原始访谈记录（用于完整性评估）:
-${transcript}
-
-请从已上传的商业计划书文档中检索信息以评估报告的深度和质量。
-
-请按照以下格式输出评估结果：
-${JSON.stringify(validatePrompt.outputFormat, null, 2)}`;
-
-            const contents = [{
-                role: 'user',
-                parts: [{ text: prompt }]
-            }];
-
-            const result = await generateWithFileSearch(contents, validatePrompt.role, fileSearchStoreName, -1, model);
-
-            try {
-                return JSON.parse(result);
-            } catch {
-                return { score: 80, pass: true, note: result };
-            }
-
-        } else {
-            // TRADITIONAL MODE
-            console.log('📋 Using traditional full-context mode for excellence validation');
-
-            // Build content parts with all available data for comprehensive evaluation
-            const contentParts = [
-                { text: `${validatePrompt.role}
-
-评估标准：
-${validatePrompt.criteria.map((criteria, i) => `${i + 1}. ${criteria}`).join('\n')}
-
-评分系统：
-${validatePrompt.outputFormat}
-
-报告内容:
-${report}
-
-原始访谈记录（用于完整性评估）:
-${transcript}
-
-商业计划书分析（用于深度评估）:
-${combinedAnalyses || '无商业计划书数据'}` }
-            ];
-
-            // Add uploaded files for comprehensive quality assessment
-            if (fileUris && fileUris.length > 0) {
-                contentParts.push({ text: '\n\n**原始文档用于质量评估:**' });
-                fileUris.forEach(file => {
-                    if (file.content) {
-                        // For local TXT files
-                        contentParts.push({ text: `\n文档：${file.displayName}\n${file.content}` });
-                    } else {
-                        // For uploaded files
-                        contentParts.push({
-                            fileData: {
-                                mimeType: file.mimeType,
-                                fileUri: file.uri
-                            }
-                        });
-                    }
-                });
-            }
-
-            contentParts.push({ text: `\n\n请按照以下格式输出评估结果：\n${JSON.stringify(validatePrompt.outputFormat, null, 2)}` });
-
-            const convertedParts = convertContentParts(contentParts);
-            const result = await generateWithRetry(convertedParts, validatePrompt.role, -1);
-
-            try {
-                return JSON.parse(result);
-            } catch {
-                return { score: 80, pass: true, note: result };
-            }
-        }
-
-    } catch (error) {
-        console.error('Error in validateExcellence:', error);
-        return { score: 75, pass: true, error: error.message };
-    }
-}
-
 
 

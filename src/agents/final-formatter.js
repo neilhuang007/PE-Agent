@@ -1,5 +1,5 @@
 // Final formatting agent to ensure enhanced reports are properly formatted and displayed
-import { generateWithRetry, convertContentParts } from '../utils/gemini-wrapper.js';
+import { generateWithRetry, convertContentParts, generateWithFileSearch } from '../utils/gemini-wrapper.js';
 import { marked } from 'https://cdn.jsdelivr.net/npm/marked@11.2.0/+esm';
 
 // Load prompts from centralized JSON files
@@ -23,7 +23,7 @@ async function loadFormatterPrompts() {
  * Final formatter agent that ensures the enhanced report is professionally formatted
  * and ready for display with optimal readability and structure
  */
-export async function finalReportFormatter(report, model) {
+export async function finalReportFormatter(report, model, fileSearchStoreName = null) {
     if (!report || typeof report !== 'string') {
         console.error('❌ 无效的报告输入');
         return report;
@@ -37,14 +37,23 @@ export async function finalReportFormatter(report, model) {
         return report;
     }
     
-    const prompt = `${promptConfig.userPrompt}\n\nReport content to format:\n${report}`;
+    const ragNotice = fileSearchStoreName
+        ? '\n\n【RAG 提示】所有引用均可通过统一的 Google File API + File Search 存储验证，确保最终格式化保持事实准确。'
+        : '';
+
+    const prompt = `${promptConfig.userPrompt}${ragNotice}\n\nReport content to format:\n${report}`;
 
     // Log the full prompt to confirm all content is sent
     console.log('Formatter prompt (full):', prompt);
 
     try {
         const parts = convertContentParts([{ text: prompt }]);
-        const formattedReport = await generateWithRetry(parts, promptConfig.systemPrompt, -1);
+        let formattedReport;
+        if (fileSearchStoreName) {
+            formattedReport = await generateWithFileSearch(parts, promptConfig.systemPrompt, fileSearchStoreName, -1, model);
+        } else {
+            formattedReport = await generateWithRetry(parts, promptConfig.systemPrompt, -1, model);
+        }
         
         if (!formattedReport || typeof formattedReport !== 'string') {
             console.warn('⚠️ 最终格式化失败，返回原报告');
@@ -63,7 +72,7 @@ export async function finalReportFormatter(report, model) {
 /**
  * Quick formatter for fast mode - lighter formatting with focus on readability
  */
-export async function quickFinalFormatter(report, model) {
+export async function quickFinalFormatter(report, model, fileSearchStoreName = null) {
     if (!report || typeof report !== 'string') {
         console.error('❌ 无效的报告输入');
         return report;
@@ -77,12 +86,21 @@ export async function quickFinalFormatter(report, model) {
         return report;
     }
     
-    const prompt = `${promptConfig.userPrompt}\n\nReport content to format:\n${report}`;
+    const ragNotice = fileSearchStoreName
+        ? '\n\n【RAG 提示】统一的 Google File API + File Search 存储可用于核验格式化输出。'
+        : '';
+
+    const prompt = `${promptConfig.userPrompt}${ragNotice}\n\nReport content to format:\n${report}`;
 
     try {
         const parts = convertContentParts([{ text: prompt }]);
-        const result = await generateWithRetry(parts, promptConfig.systemPrompt, -1);
-        
+        let result;
+        if (fileSearchStoreName) {
+            result = await generateWithFileSearch(parts, promptConfig.systemPrompt, fileSearchStoreName, -1, model);
+        } else {
+            result = await generateWithRetry(parts, promptConfig.systemPrompt, -1, model);
+        }
+
         if (!result || typeof result !== 'string') {
             console.warn('⚠️ 快速格式化失败，返回原报告');
             return report;
@@ -90,7 +108,7 @@ export async function quickFinalFormatter(report, model) {
 
         console.log('✅ 快速格式化完成');
         return result;
-        
+
     } catch (error) {
         console.error('快速格式化错误:', error);
         return report;
