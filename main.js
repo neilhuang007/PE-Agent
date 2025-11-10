@@ -1261,7 +1261,11 @@ function updateFilesList() {
         if (file.mimeType === 'text/plain') return 'TXT';
         if (file.mimeType === 'application/pdf') return 'PDF';
         if (file.mimeType === 'application/vnd.openxmlformats-officedocument.wordprocessingml.document') return 'DOCX';
+        if (file.mimeType === 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet') return 'XLSX';
+        if (file.mimeType === 'application/vnd.ms-excel') return 'XLS';
         if (file.displayName.toLowerCase().endsWith('.docx')) return 'DOCX';
+        if (file.displayName.toLowerCase().endsWith('.xlsx')) return 'XLSX';
+        if (file.displayName.toLowerCase().endsWith('.xls')) return 'XLS';
         if (file.displayName.toLowerCase().endsWith('.txt')) return 'TXT';
         if (file.displayName.toLowerCase().endsWith('.pdf')) return 'PDF';
         return 'FILE';
