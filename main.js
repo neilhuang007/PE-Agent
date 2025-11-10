@@ -1251,6 +1251,24 @@ async function processSelectedFiles(files) {
         const file = files[i];
         fileUploadStatus.innerHTML = `正在处理 ${file.name}...`;
 
+        // Check if file is an Excel file
+        const isExcel = file.type === 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' ||
+                        file.name.toLowerCase().endsWith('.xlsx');
+
+        if (isExcel) {
+            // Excel files are not supported by regular Files API, skip to File Search Store
+            console.log(`📊 Excel文件检测: ${file.name} - 将仅上传到 File Search Store`);
+            fileUploadStatus.innerHTML = `处理 Excel 文件: ${file.name} (将上传到 File Search Store)`;
+            // Create a placeholder entry for the file that will be uploaded to File Search Store
+            allUploadedFiles.push({
+                uri: `file_search_only_${Date.now()}_${i}`,
+                mimeType: file.type,
+                displayName: file.name,
+                fileSearchOnly: true // Flag to indicate this file is only in File Search Store
+            });
+            continue;
+        }
+
         // Check if file is a DOCX file
         const isDocx = file.type === 'application/vnd.openxmlformats-officedocument.wordprocessingml.document' ||
                        file.name.toLowerCase().endsWith('.docx');
@@ -1302,7 +1320,7 @@ async function processSelectedFiles(files) {
             fileUploadStatus.innerHTML = `正在创建文件搜索存储 (RAG)...`;
 
             // Create file search store
-            const store = await createFileSearchStore(genAI, `PE-Agent-${Date.now()}`);
+            const store = await createFileSearchStore(`PE-Agent-${Date.now()}`);
             fileSearchStoreName = store.name;
 
             // Upload files to the store
@@ -1313,7 +1331,7 @@ async function processSelectedFiles(files) {
                 mimeType: file.type
             }));
 
-            await uploadToFileSearchStore(genAI, filesToUpload);
+            await uploadToFileSearchStore(fileSearchStoreName, filesToUpload);
             console.log('✅ 文件已上传到 File Search Store for RAG');
         }
     } catch (error) {
