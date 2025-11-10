@@ -47,6 +47,19 @@ export function initGeminiClient(apiKey, proxyUrl) {
     }
 }
 /**
+ * Validate that the model parameter is a non-empty string.
+ * @throws {Error} if model is not a string or is empty
+ */
+function validateModel(model) {
+    if (typeof model !== 'string') {
+        throw new Error(`Model must be a string, got ${typeof model}`);
+    }
+    if (model.trim().length === 0) {
+        throw new Error('Model cannot be an empty string');
+    }
+}
+
+/**
  * Convert an array of simple part objects (text or fileData) into the
  * Content[] structure expected by the Gemini API.
  */
@@ -66,6 +79,7 @@ export function convertContentParts(parts) {
  * When behind a firewall, send the request directly using node‑fetch through a proxy.
  */
 async function callGeminiDirect(contents, systemPrompt, thinkingBudget, model) {
+    validateModel(model);
     if (!proxyConfig)
         throw new Error('Proxy config not initialized');
     // Build the full endpoint and include the API key in the query string
@@ -109,6 +123,7 @@ async function callGeminiDirect(contents, systemPrompt, thinkingBudget, model) {
  * Fallback to the official SDK for streaming content when not using a proxy.
  */
 async function callGeminiStream(contents, systemPrompt, thinkingBudget = -1, model = 'gemini-2.5-pro') {
+    validateModel(model);
     // If proxy is configured, we call the direct function instead
     if (useProxy && proxyConfig) {
         return callGeminiDirect(contents, systemPrompt, thinkingBudget, model);
@@ -291,6 +306,7 @@ export async function uploadToFileSearchStore(storeName, files) {
  * Generate content with File Search RAG
  */
 export async function generateWithFileSearch(contents, systemPrompt, storeName, thinkingBudget = -1, model = 'gemini-2.5-pro') {
+    validateModel(model);
     if (useProxy && proxyConfig) {
         // For proxy mode, we need to manually construct the request with file search
         throw new Error('File Search is not yet supported in proxy mode');
