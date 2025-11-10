@@ -1,6 +1,5 @@
 import { GoogleGenerativeAI } from 'https://esm.run/@google/generative-ai';
 import { initGeminiClient, generateWithRetry, convertContentParts, createFileSearchStore, uploadToFileSearchStore, deleteFileSearchStore } from './src/utils/gemini-wrapper.js';
-import { uploadFile, deleteFile } from './src/utils/gemini-wrapper.js';
 import { 
     deepExtractChunk, 
     verifyCitations,
@@ -612,27 +611,8 @@ function renderEnhancementTask(taskObj, cardIndex, total) {
     }
 }
 
-// Placeholder functions for file upload/delete until proper implementation
-async function uploadFileToGemini(file, apiKey) {
-    // Delegate to the wrapper helper and reformat the return value.
-    const uploaded = await uploadFile(file);
-    return {
-        displayName: file.name,
-        mimeType: file.type,
-        uri: uploaded.uri,
-        name: uploaded.name,
-        // state is optional but returned from the wrapper
-        state: uploaded.state
-    };
-}
-
-
-async function deleteFileFromGemini(name, apiKey) {
-    await deleteFile(name);
-    return true;
-}
-
-
+// File upload/delete is now handled through File Search Store (RAG)
+// Individual file upload/delete functions are deprecated
 
 // Initialize Gemini AI
 function initializeGemini() {
@@ -727,7 +707,7 @@ async function generateReport(e) {
                     console.log(`文件 ${fileIndex + 1} 分析完成: ${fileName} - ${analysis.length} 字符`);
                 };
                 
-                const bpResult = await comprehensiveBPAnalysis(allUploadedFiles, model, genAI, fileAnalysisCallback);
+                const bpResult = await comprehensiveBPAnalysis(allUploadedFiles, model, genAI, fileAnalysisCallback, fileSearchStoreName);
                 combinedAnalyses = bpResult.combinedAnalyses;
                 fileSummaries = bpResult.fileSummaries;
                 updateProgress(25, `文档分析完成 - 提取了 ${combinedAnalyses.length} 字符的结构化数据`);
@@ -1162,19 +1142,11 @@ async function generateReport(e) {
         reportOutput.innerHTML = htmlFormattedReport;
         document.getElementById('downloadBtnContainer').style.display = 'flex';
         
-        // Clean up uploaded files after 10 minutes (increased time for multiple sessions)
-        if (allUploadedFiles.length > 0) {
-            setTimeout(async () => {
-                for (const file of allUploadedFiles) {
-                    if (file.uri && !file.uri.startsWith('local_')) {
-                        await deleteFileFromGemini(file.uri, getApiKey());
-                    }
-                }
-                console.log('已清理上传的文件');
-                allUploadedFiles = []; // Clear the array
-                updateFilesList(); // Update UI
-            }, 600000); // 10 minutes
-        }
+        // Clean up file metadata after report generation
+        // Note: File Search Store is kept for potential re-use
+        // To delete the store, call deleteFileSearchStore(fileSearchStoreName)
+        console.log('✅ 报告生成完成，文件保留在 RAG 系统中供后续使用');
+        console.log(`📦 File Search Store: ${fileSearchStoreName}`);
         
     } catch (error) {
         console.error('Error:', error);
@@ -1220,15 +1192,11 @@ function updateFilesList() {
 }
 
 // Remove a file from the uploaded files list
+// Note: Individual files cannot be removed from File Search Store
+// This only removes from the metadata tracking
 window.removeFile = async function (index) {
-    const file = allUploadedFiles[index];
-    if (file && file.uri && !file.uri.startsWith('local_') && file.name) {
-        try {
-            await deleteFileFromGemini(file.name, getApiKey());
-        } catch (error) {
-            console.error('Failed to delete file:', error);
-        }
-    }
+    console.warn('⚠️ 注意：文件已上传到 RAG 系统，只能从显示列表中移除，无法从系统中删除');
+    console.warn('要完全清理所有文件，需要删除整个 File Search Store');
     allUploadedFiles.splice(index, 1);
     updateFilesList();
 };
@@ -1245,99 +1213,64 @@ async function processSelectedFiles(files) {
         generateBtn.textContent = '文件上传中...';
     }
 
-    // Regular file upload to Gemini
-    // Note: DOCX files are not supported by the regular Files API, only by File Search Store
-    for (let i = 0; i < files.length; i++) {
-        const file = files[i];
-        fileUploadStatus.innerHTML = `正在处理 ${file.name}...`;
+    console.log(`📤 开始上传 ${files.length} 个文件到 File Search Store (RAG)...`);
 
-        // Check if file is an Excel file
-        const isExcel = file.type === 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' ||
-                        file.name.toLowerCase().endsWith('.xlsx');
-
-        if (isExcel) {
-            // Excel files are not supported by regular Files API, skip to File Search Store
-            console.log(`📊 Excel文件检测: ${file.name} - 将仅上传到 File Search Store`);
-            fileUploadStatus.innerHTML = `处理 Excel 文件: ${file.name} (将上传到 File Search Store)`;
-            // Create a placeholder entry for the file that will be uploaded to File Search Store
-            allUploadedFiles.push({
-                uri: `file_search_only_${Date.now()}_${i}`,
-                mimeType: file.type,
-                displayName: file.name,
-                fileSearchOnly: true // Flag to indicate this file is only in File Search Store
-            });
-            continue;
-        }
-
-        // Check if file is a DOCX file
-        const isDocx = file.type === 'application/vnd.openxmlformats-officedocument.wordprocessingml.document' ||
-                       file.name.toLowerCase().endsWith('.docx');
-
-        if (isDocx) {
-            // DOCX files are not supported by regular Files API, skip to File Search Store
-            console.log(`📄 DOCX文件检测: ${file.name} - 将仅上传到 File Search Store`);
-            fileUploadStatus.innerHTML = `处理 DOCX 文件: ${file.name} (将上传到 File Search Store)`;
-            // Create a placeholder entry for the file that will be uploaded to File Search Store
-            allUploadedFiles.push({
-                uri: `file_search_only_${Date.now()}_${i}`,
-                mimeType: file.type,
-                displayName: file.name,
-                fileSearchOnly: true // Flag to indicate this file is only in File Search Store
-            });
-            continue;
-        }
-
-        try {
-            const uploadedFile = await uploadFileToGemini(file, getApiKey());
-            allUploadedFiles.push(uploadedFile);
-            console.log(`成功上传: ${file.name} (${file.type})`);
-            console.log(`当前文件数组大小: ${allUploadedFiles.length}`);
-        } catch (error) {
-            console.error(`上传失败 ${file.name}:`, error);
-            // For TXT files, we could read them directly as fallback
-            if (file.type === 'text/plain' || file.name.toLowerCase().endsWith('.txt')) {
-                try {
-                    const text = await file.text();
-                    allUploadedFiles.push({
-                        uri: `local_txt_${Date.now()}`,
-                        mimeType: 'text/plain',
-                        displayName: file.name,
-                        content: text // Store content directly for local TXT files
-                    });
-                    console.log(`TXT文件本地处理: ${file.name}`);
-                } catch (txtError) {
-                    console.error(`TXT文件处理失败: ${file.name}`, txtError);
-                }
-            }
-        }
-    }
-
-    // Initialize File Search Store for RAG (create once, reuse for all files)
-    // Note: File Search Store supports DOCX, PDF, TXT, JSON, and many other formats
+    // Simplified workflow: Upload ALL files to File Search Store (RAG)
+    // This supports all file types: PDF, DOCX, XLSX, TXT, JSON, etc.
     try {
         const genAI = initializeGemini();
-        if (genAI && files.length > 0 && !fileSearchStoreName) {
-            fileUploadStatus.innerHTML = `正在创建文件搜索存储 (RAG)...`;
+        if (!genAI) {
+            throw new Error('Gemini client initialization failed');
+        }
 
-            // Create file search store
+        // Create file search store if not exists
+        if (!fileSearchStoreName) {
+            fileUploadStatus.innerHTML = `正在创建文件搜索存储 (RAG)...`;
+            console.log('📦 Creating new File Search Store...');
+
             const store = await createFileSearchStore(`PE-Agent-${Date.now()}`);
             fileSearchStoreName = store.name;
-
-            // Upload files to the store
-            fileUploadStatus.innerHTML = `正在上传文件到搜索存储...`;
-            const filesToUpload = Array.from(files).map((file, index) => ({
-                file: file,
-                displayName: file.name,
-                mimeType: file.type
-            }));
-
-            await uploadToFileSearchStore(fileSearchStoreName, filesToUpload);
-            console.log('✅ 文件已上传到 File Search Store for RAG');
+            console.log(`✅ File Search Store created: ${fileSearchStoreName}`);
         }
+
+        // Upload all files to the store
+        fileUploadStatus.innerHTML = `正在上传 ${files.length} 个文件到 RAG 系统...`;
+        console.log(`📁 Uploading ${files.length} files to File Search Store...`);
+
+        const filesToUpload = Array.from(files).map((file) => ({
+            file: file,
+            displayName: file.name,
+            mimeType: file.type
+        }));
+
+        await uploadToFileSearchStore(fileSearchStoreName, filesToUpload);
+
+        // Track uploaded files metadata (no URIs needed since we use RAG)
+        for (let i = 0; i < files.length; i++) {
+            const file = files[i];
+            allUploadedFiles.push({
+                displayName: file.name,
+                mimeType: file.type,
+                size: file.size,
+                uploadTime: new Date().toISOString()
+            });
+        }
+
+        console.log(`✅ 所有 ${files.length} 个文件已上传到 File Search Store (RAG 模式)`);
+
     } catch (error) {
-        console.error('⚠️ File Search Store 初始化失败，将使用传统模式:', error);
-        // Continue with traditional mode if File Search fails
-        fileSearchStoreName = null;
+        console.error('❌ File Search Store 上传失败:', error);
+        fileUploadStatus.innerHTML = `文件上传失败: ${error.message}`;
+
+        // Mark upload as complete and re-enable generate button
+        isUploadInProgress = false;
+        if (generateBtn) {
+            generateBtn.disabled = false;
+            generateBtn.textContent = '生成报告';
+        }
+
+        alert(`文件上传失败: ${error.message}\n\n请检查:\n1. API Key 是否有效\n2. 网络连接是否正常\n3. 文件格式是否支持`);
+        return;
     }
 
     updateFilesList();
@@ -1349,8 +1282,7 @@ async function processSelectedFiles(files) {
         generateBtn.textContent = '生成报告';
     }
 
-    const ragStatus = fileSearchStoreName ? '(RAG模式已启用)' : '(传统模式)';
-    fileUploadStatus.innerHTML = `已处理 ${files.length} 个文件 ${ragStatus} - 可以开始生成报告`;
+    fileUploadStatus.innerHTML = `✅ 已上传 ${files.length} 个文件到 RAG 系统 - 可以开始生成报告`;
     setTimeout(() => {
         fileUploadStatus.innerHTML = '';
     }, 3000);

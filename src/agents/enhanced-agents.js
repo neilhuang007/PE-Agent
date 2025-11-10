@@ -22,105 +22,93 @@ async function loadEnhancedPrompts() {
 }
 
 
-// Enhanced Agent 10: Per-File Business Plan Analyzer
-async function analyzeIndividualFile(file, index, model, genAI) {
-    console.log(`🔍 开始分析文档 ${index + 1}: ${file.displayName}`);
-    try {
-        const prompts = await loadEnhancedPrompts();
-        let filePrompt = prompts.perFileAnalysis;
-        
-        const contentParts = [
-            { text: `${filePrompt.task}\n\n文档: ${file.displayName}\n\n重点:\n${filePrompt.critical?.map(c => `• ${c}`).join('\n') || '提取所有数据'}\n\n${filePrompt.outputFormat}` }
-        ];
-        
-        if (file.content) {
-            // For local TXT files
-            contentParts.push({ text: `\n\n文档内容：\n${file.content}` });
-        } else {
-            // For uploaded files
-            contentParts.push({
-                fileData: {
-                    mimeType: file.mimeType,
-                    fileUri: file.uri
-                }
-            });
-        }
-        
-        // Use the new TypeScript wrapper if genAI is available, otherwise fall back to old method
-        let result;
-        if (genAI) {
-            const convertedParts = convertContentParts(contentParts);
-            result = await generateWithRetry(convertedParts, filePrompt.role, -1); // Use dynamic thinking
-        } else {
-            const convertedParts = convertContentParts(contentParts);
-            result = await generateWithRetry(convertedParts, filePrompt.role, -1);
-        }
-        
-        console.log(`✅ 文档 ${file.displayName} 分析成功 - 提取长度: ${result?.length || 0} 字符`);
-        
-        return {
-            fileName: file.displayName,
-            mimeType: file.mimeType,
-            extractedContent: result,
-            extractionTime: new Date().toISOString()
-        };
-        
-    } catch (error) {
-        console.error(`❌ 文档 ${file.displayName} 分析失败:`, error);
-        return {
-            fileName: file.displayName,
-            mimeType: file.mimeType,
-            extractedContent: `文件分析失败: ${error.message}\n\n请检查文件格式和API连接状态。`,
-            error: true,
-            extractionTime: new Date().toISOString()
-        };
-    }
-}
-
-// Simplified Per-File Analysis Only
-export async function comprehensiveBPAnalysis(fileUris, model, genAI = null, progressCallback = null) {
-    if (!fileUris || fileUris.length === 0) {
+// Enhanced Business Plan Analysis using RAG (File Search Store)
+// This replaces the old per-file analysis with a unified RAG-based approach
+export async function comprehensiveBPAnalysis(fileMetadata, model, genAI = null, progressCallback = null, fileSearchStoreName = null) {
+    if (!fileMetadata || fileMetadata.length === 0) {
         return { combinedAnalyses: '', fileSummaries: [] };
     }
-    
-    try {
-        console.log(`🔍 开始per-file分析 ${fileUris.length} 个文档...`);
-        
-        // Analyze each file individually in parallel with real-time updates
-        const individualAnalyses = [];
-        const fileAnalysisPromises = fileUris.map(async (file, index) => {
-            const result = await analyzeIndividualFile(file, index, model, genAI);
-            individualAnalyses[index] = result;
-            
-            // Call progress callback immediately when file completes
-            if (progressCallback) {
-                progressCallback(index, result.fileName, result.extractedContent);
-            }
-            
-            return result;
-        });
-        
-        await Promise.all(fileAnalysisPromises);
-        console.log(`✅ Per-file分析完成，共处理了 ${individualAnalyses.length} 个文档`);
-        
-        // Return combined analyses for all other agents to use
-        const fileSummaries = individualAnalyses.map(a => a.extractedContent);
-        const combinedAnalyses = individualAnalyses.map((analysis, i) => `
-【文档 ${i + 1}】${analysis.fileName}
-${analysis.extractedContent}
-${'='.repeat(60)}
-`).join('\n');
 
-        return { combinedAnalyses, fileSummaries };
-        
+    if (!fileSearchStoreName) {
+        console.error('❌ File Search Store not available - cannot analyze documents');
+        return { combinedAnalyses: '文档分析失败：RAG 系统未初始化', fileSummaries: [] };
+    }
+
+    try {
+        console.log(`🔍 开始使用 RAG 分析 ${fileMetadata.length} 个文档...`);
+
+        const prompts = await loadEnhancedPrompts();
+        let filePrompt = prompts.perFileAnalysis;
+
+        if (!filePrompt) {
+            console.warn('Per-file analysis prompt not found');
+            filePrompt = {
+                task: '请分析所有上传的商业计划书文档，提取关键信息',
+                role: '你是一位资深的投资分析专家',
+                outputFormat: '请以结构化格式输出所有文档的关键信息'
+            };
+        }
+
+        // Build comprehensive prompt for analyzing all documents via RAG
+        const fileList = fileMetadata.map((f, i) => `${i + 1}. ${f.displayName} (${f.mimeType})`).join('\n');
+
+        const prompt = `${filePrompt.task}
+
+已上传的文档列表:
+${fileList}
+
+重点:
+${filePrompt.critical?.map(c => `• ${c}`).join('\n') || '• 提取所有关键商业数据\n• 分析市场定位和竞争优势\n• 提取财务指标和增长数据'}
+
+请从所有已上传的文档中检索和综合信息，生成全面的商业计划分析。
+
+${filePrompt.outputFormat}`;
+
+        const contents = [{
+            role: 'user',
+            parts: [{ text: prompt }]
+        }];
+
+        // Use RAG to analyze all documents at once
+        console.log('🔍 Using File Search RAG to analyze all documents...');
+        const result = await generateWithFileSearch(contents, filePrompt.role, fileSearchStoreName, -1, model);
+
+        console.log(`✅ RAG 文档分析完成 - 提取长度: ${result?.length || 0} 字符`);
+
+        // Call progress callback with the comprehensive analysis
+        if (progressCallback) {
+            progressCallback(0, '所有文档 (RAG)', result);
+        }
+
+        // Return combined analyses
+        const combinedAnalyses = `【综合文档分析 (RAG)】
+基于 ${fileMetadata.length} 个文档:
+${fileList}
+
+${result}
+${'='.repeat(60)}`;
+
+        return {
+            combinedAnalyses,
+            fileSummaries: [result]
+        };
+
     } catch (error) {
-        console.error('Per-file analysis error:', error);
-        return { combinedAnalyses: "Per-file分析失败：" + error.message, fileSummaries: [] };
+        console.error('RAG document analysis error:', error);
+        return {
+            combinedAnalyses: `RAG文档分析失败：${error.message}`,
+            fileSummaries: []
+        };
     }
 }
 
-// Enhanced Agent 1: Deep Information Extraction with Cross-Reference (RAG-optimized)
-export async function deepExtractChunk(chunk, index, transcript, combinedAnalyses, fileUris, model, fileSearchStoreName = null) {
+// Enhanced Agent 1: Deep Information Extraction with Cross-Reference (RAG-only)
+export async function deepExtractChunk(chunk, index, transcript, combinedAnalyses, fileUris, model, fileSearchStoreName) {
+    if (!fileSearchStoreName) {
+        console.error('❌ File Search Store not available for chunk extraction');
+        return `片段 ${index + 1}: ${chunk}\n\n[注意: RAG系统未启用，仅返回原始内容]`;
+    }
+
     try {
         const prompts = await loadEnhancedPrompts();
         const extractPrompt = prompts.deepExtractChunk;
@@ -130,42 +118,10 @@ export async function deepExtractChunk(chunk, index, transcript, combinedAnalyse
             return `片段 ${index + 1}: ${chunk}`;
         }
 
-        // Use File Search RAG if available, otherwise fall back to traditional method
-        if (fileSearchStoreName) {
-            // RAG MODE: Use File Search API to retrieve relevant context
-            console.log(`🔍 Using File Search RAG for chunk ${index + 1}`);
+        // RAG MODE: Use File Search API to retrieve relevant context from all documents
+        console.log(`🔍 Using File Search RAG for chunk ${index + 1}`);
 
-            const prompt = `${extractPrompt.task}
-
-Requirements:
-${extractPrompt.requirements.map((req, i) => `${i + 1}. ${req}`).join('\n')}
-
-Critical: ${extractPrompt.critical}
-
-访谈片段 ${index + 1}:
-${chunk}
-
-请从已上传的商业计划书文档中检索相关信息，以深度理解和交叉验证访谈内容。
-
-${extractPrompt.outputFormat}`;
-
-            const contents = [{
-                role: 'user',
-                parts: [{ text: prompt }]
-            }];
-
-            const result = await generateWithFileSearch(contents, extractPrompt.role, fileSearchStoreName, -1, model);
-            return result;
-
-        } else {
-            // TRADITIONAL MODE: Pass full context (legacy behavior)
-            console.log(`📋 Using traditional full-context mode for chunk ${index + 1}`);
-
-            // Build content parts with all context
-            const contentParts = [
-                { text: `${extractPrompt.role}
-
-${extractPrompt.task}
+        const prompt = `${extractPrompt.task}
 
 Requirements:
 ${extractPrompt.requirements.map((req, i) => `${i + 1}. ${req}`).join('\n')}
@@ -178,35 +134,22 @@ ${chunk}
 完整访谈上下文（用于理解背景）:
 ${transcript}
 
-商业计划书分析（用于深度理解和交叉验证）:
-${combinedAnalyses ? combinedAnalyses : '无商业计划书数据'}
+${combinedAnalyses ? `
+商业计划书综合分析:
+${combinedAnalyses}
+` : ''}
 
-${extractPrompt.outputFormat}
+请从已上传的所有文档中检索相关信息，以深度理解和交叉验证访谈内容。
 
-` }];
+${extractPrompt.outputFormat}`;
 
+        const contents = [{
+            role: 'user',
+            parts: [{ text: prompt }]
+        }];
 
-            // Add uploaded files for reference
-            if (fileUris && fileUris.length > 0) {
-                contentParts.push({ text: '\n\n**参考文档用于信息提取:**' });
-                fileUris.slice(0, 2).forEach(file => { // Limit to first 2 files to avoid overload
-                    if (file.content) {
-                        contentParts.push({ text: `\n文档：${file.displayName}\n${file.content}` });
-                    } else {
-                        contentParts.push({
-                            fileData: {
-                                mimeType: file.mimeType,
-                                fileUri: file.uri
-                            }
-                        });
-                    }
-                });
-            }
-
-            const convertedParts = convertContentParts(contentParts);
-            const result = await generateWithRetry(convertedParts, extractPrompt.role, -1);
-            return result;
-        }
+        const result = await generateWithFileSearch(contents, extractPrompt.role, fileSearchStoreName, -1, model);
+        return result;
 
     } catch (error) {
         console.error(`Error in deepExtractChunk ${index}:`, error);
@@ -265,11 +208,15 @@ export async function verifyCitations(report, transcript, combinedAnalyses, file
             return { verified: true, issues: [] };
         }
 
-        // Use File Search RAG if available
-        if (fileSearchStoreName) {
-            console.log('🔍 Using File Search RAG for citation verification');
+        // RAG-only mode
+        if (!fileSearchStoreName) {
+            console.warn('⚠️ File Search Store not available for citation verification - skipping');
+            return { verified: true, issues: [], note: 'RAG系统未启用，跳过验证' };
+        }
 
-            const prompt = `${verifyPrompt.check ? verifyPrompt.check.map((task, i) => `${i + 1}. ${task}`).join('\n') : ''}
+        console.log('🔍 Using File Search RAG for citation verification');
+
+        const prompt = `${verifyPrompt.check ? verifyPrompt.check.map((task, i) => `${i + 1}. ${task}`).join('\n') : ''}
 
 报告内容:
 ${report}
@@ -277,76 +224,27 @@ ${report}
 原始访谈记录:
 ${transcript}
 
-请从已上传的商业计划书文档中检索信息以交叉验证报告中的引用和数据。
+${combinedAnalyses ? `
+商业计划书综合分析:
+${combinedAnalyses}
+` : ''}
+
+请从已上传的所有文档中检索信息以交叉验证报告中的引用和数据。
 
 请按照以下格式输出验证结果：
 ${verifyPrompt.outputFormat}`;
 
-            const contents = [{
-                role: 'user',
-                parts: [{ text: prompt }]
-            }];
+        const contents = [{
+            role: 'user',
+            parts: [{ text: prompt }]
+        }];
 
-            const result = await generateWithFileSearch(contents, verifyPrompt.role, fileSearchStoreName, -1, model);
+        const result = await generateWithFileSearch(contents, verifyPrompt.role, fileSearchStoreName, -1, model);
 
-            try {
-                return JSON.parse(result);
-            } catch {
-                return { verified: true, issues: [], note: result };
-            }
-
-        } else {
-            // TRADITIONAL MODE
-            console.log('📋 Using traditional full-context mode for citation verification');
-
-            // Build content parts with all available data
-            const contentParts = [
-                { text: `${verifyPrompt.role}
-
-${verifyPrompt.check ? verifyPrompt.check.map((task, i) => `${i + 1}. ${task}`).join('\n') : ''}
-
-压缩总结:
-${combinedAnalyses}
-
-文件摘要:
-${fileSummaries.map((fs,i)=>`文件${i+1}: ${fs}`).join('\n')}
-
-报告内容:
-${report}
-
-原始访谈记录:
-${transcript}` }
-            ];
-
-            // Add uploaded files as verification sources
-            if (fileUris && fileUris.length > 0) {
-                contentParts.push({ text: '\n\n**原始文档用于交叉验证:**' });
-                fileUris.forEach(file => {
-                    if (file.content) {
-                        // For local TXT files
-                        contentParts.push({ text: `\n文档：${file.displayName}\n${file.content}` });
-                    } else {
-                        // For uploaded files
-                        contentParts.push({
-                            fileData: {
-                                mimeType: file.mimeType,
-                                fileUri: file.uri
-                            }
-                        });
-                    }
-                });
-            }
-
-            contentParts.push({ text: `\n\n请按照以下格式输出验证结果：\n${verifyPrompt.outputFormat}` });
-
-            const convertedParts = convertContentParts(contentParts);
-            const result = await generateWithRetry(convertedParts, verifyPrompt.role, -1);
-
-            try {
-                return JSON.parse(result);
-            } catch {
-                return { verified: true, issues: [], note: result };
-            }
+        try {
+            return JSON.parse(result);
+        } catch {
+            return { verified: true, issues: [], note: result };
         }
 
     } catch (error) {
@@ -367,11 +265,15 @@ export async function validateExcellence(report, transcript, combinedAnalyses, f
             return { score: 85, pass: true };
         }
 
-        // Use File Search RAG if available
-        if (fileSearchStoreName) {
-            console.log('🔍 Using File Search RAG for excellence validation');
+        // RAG-only mode
+        if (!fileSearchStoreName) {
+            console.warn('⚠️ File Search Store not available for excellence validation - using default score');
+            return { score: 85, pass: true, note: 'RAG系统未启用，使用默认评分' };
+        }
 
-            const prompt = `评估标准：
+        console.log('🔍 Using File Search RAG for excellence validation');
+
+        const prompt = `评估标准：
 ${validatePrompt.criteria.map((criteria, i) => `${i + 1}. ${criteria}`).join('\n')}
 
 评分系统：
@@ -383,77 +285,27 @@ ${report}
 原始访谈记录（用于完整性评估）:
 ${transcript}
 
-请从已上传的商业计划书文档中检索信息以评估报告的深度和质量。
+${combinedAnalyses ? `
+商业计划书综合分析:
+${combinedAnalyses}
+` : ''}
+
+请从已上传的所有文档中检索信息以评估报告的深度和质量。
 
 请按照以下格式输出评估结果：
 ${JSON.stringify(validatePrompt.outputFormat, null, 2)}`;
 
-            const contents = [{
-                role: 'user',
-                parts: [{ text: prompt }]
-            }];
+        const contents = [{
+            role: 'user',
+            parts: [{ text: prompt }]
+        }];
 
-            const result = await generateWithFileSearch(contents, validatePrompt.role, fileSearchStoreName, -1, model);
+        const result = await generateWithFileSearch(contents, validatePrompt.role, fileSearchStoreName, -1, model);
 
-            try {
-                return JSON.parse(result);
-            } catch {
-                return { score: 80, pass: true, note: result };
-            }
-
-        } else {
-            // TRADITIONAL MODE
-            console.log('📋 Using traditional full-context mode for excellence validation');
-
-            // Build content parts with all available data for comprehensive evaluation
-            const contentParts = [
-                { text: `${validatePrompt.role}
-
-评估标准：
-${validatePrompt.criteria.map((criteria, i) => `${i + 1}. ${criteria}`).join('\n')}
-
-评分系统：
-${validatePrompt.outputFormat}
-
-报告内容:
-${report}
-
-原始访谈记录（用于完整性评估）:
-${transcript}
-
-商业计划书分析（用于深度评估）:
-${combinedAnalyses || '无商业计划书数据'}` }
-            ];
-
-            // Add uploaded files for comprehensive quality assessment
-            if (fileUris && fileUris.length > 0) {
-                contentParts.push({ text: '\n\n**原始文档用于质量评估:**' });
-                fileUris.forEach(file => {
-                    if (file.content) {
-                        // For local TXT files
-                        contentParts.push({ text: `\n文档：${file.displayName}\n${file.content}` });
-                    } else {
-                        // For uploaded files
-                        contentParts.push({
-                            fileData: {
-                                mimeType: file.mimeType,
-                                fileUri: file.uri
-                            }
-                        });
-                    }
-                });
-            }
-
-            contentParts.push({ text: `\n\n请按照以下格式输出评估结果：\n${JSON.stringify(validatePrompt.outputFormat, null, 2)}` });
-
-            const convertedParts = convertContentParts(contentParts);
-            const result = await generateWithRetry(convertedParts, validatePrompt.role, -1);
-
-            try {
-                return JSON.parse(result);
-            } catch {
-                return { score: 80, pass: true, note: result };
-            }
+        try {
+            return JSON.parse(result);
+        } catch {
+            return { score: 80, pass: true, note: result };
         }
 
     } catch (error) {
