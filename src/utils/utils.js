@@ -62,7 +62,7 @@ export function downloadReport(report) {
     const companyName = document.getElementById('companyName').value;
     const date = new Date().toISOString().split('T')[0];
     const filename = `${companyName}访谈纪要_${date}.md`;
-    
+
     const blob = new Blob([report], { type: 'text/markdown;charset=utf-8' });
     const url = window.URL.createObjectURL(blob);
     const a = document.createElement('a');
@@ -72,6 +72,14 @@ export function downloadReport(report) {
     a.click();
     document.body.removeChild(a);
     window.URL.revokeObjectURL(url);
+}
+
+// Download report as Word document
+export async function downloadReportAsWord(report) {
+    const companyName = document.getElementById('companyName').value;
+    // Dynamically import the Word export module
+    const { exportToWord } = await import('./word-export.js');
+    await exportToWord(report, companyName);
 }
 
 // Build a raw draft from extracted information and file analyses

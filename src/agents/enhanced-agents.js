@@ -2,7 +2,7 @@
 // This file contains the complete enhanced agent architecture for generating
 // world-class private equity interview reports using Gemini Pro's thinking capabilities
 
-import { initGeminiClient, generateWithRetry, convertContentParts } from '../utils/gemini-wrapper.js';
+import { initGeminiClient, generateWithRetry, convertContentParts, generateWithFileSearch } from '../utils/gemini-wrapper.js';
 
 // Load prompts from centralized JSON files
 let enhancedPrompts = null;
@@ -119,20 +119,51 @@ ${'='.repeat(60)}
     }
 }
 
-// Enhanced Agent 1: Deep Information Extraction with Cross-Reference
-export async function deepExtractChunk(chunk, index, transcript, combinedAnalyses, fileUris, model) {
+// Enhanced Agent 1: Deep Information Extraction with Cross-Reference (RAG-optimized)
+export async function deepExtractChunk(chunk, index, transcript, combinedAnalyses, fileUris, model, fileSearchStoreName = null) {
     try {
         const prompts = await loadEnhancedPrompts();
         const extractPrompt = prompts.deepExtractChunk;
-        
+
         if (!extractPrompt) {
             console.warn('Deep extract prompt not found, using fallback');
             return `片段 ${index + 1}: ${chunk}`;
         }
-        
-        // Build content parts with all context
-        const contentParts = [
-            { text: `${extractPrompt.role}
+
+        // Use File Search RAG if available, otherwise fall back to traditional method
+        if (fileSearchStoreName) {
+            // RAG MODE: Use File Search API to retrieve relevant context
+            console.log(`🔍 Using File Search RAG for chunk ${index + 1}`);
+
+            const prompt = `${extractPrompt.task}
+
+Requirements:
+${extractPrompt.requirements.map((req, i) => `${i + 1}. ${req}`).join('\n')}
+
+Critical: ${extractPrompt.critical}
+
+访谈片段 ${index + 1}:
+${chunk}
+
+请从已上传的商业计划书文档中检索相关信息，以深度理解和交叉验证访谈内容。
+
+${extractPrompt.outputFormat}`;
+
+            const contents = [{
+                role: 'user',
+                parts: [{ text: prompt }]
+            }];
+
+            const result = await generateWithFileSearch(contents, extractPrompt.role, fileSearchStoreName, -1, model);
+            return result;
+
+        } else {
+            // TRADITIONAL MODE: Pass full context (legacy behavior)
+            console.log(`📋 Using traditional full-context mode for chunk ${index + 1}`);
+
+            // Build content parts with all context
+            const contentParts = [
+                { text: `${extractPrompt.role}
 
 ${extractPrompt.task}
 
@@ -155,32 +186,28 @@ ${extractPrompt.outputFormat}
 ` }];
 
 
-        console.log(contentParts.text)
+            // Add uploaded files for reference
+            if (fileUris && fileUris.length > 0) {
+                contentParts.push({ text: '\n\n**参考文档用于信息提取:**' });
+                fileUris.slice(0, 2).forEach(file => { // Limit to first 2 files to avoid overload
+                    if (file.content) {
+                        contentParts.push({ text: `\n文档：${file.displayName}\n${file.content}` });
+                    } else {
+                        contentParts.push({
+                            fileData: {
+                                mimeType: file.mimeType,
+                                fileUri: file.uri
+                            }
+                        });
+                    }
+                });
+            }
 
-        
-        // Add uploaded files for reference
-        if (fileUris && fileUris.length > 0) {
-            contentParts.push({ text: '\n\n**参考文档用于信息提取:**' });
-            fileUris.slice(0, 2).forEach(file => { // Limit to first 2 files to avoid overload
-                if (file.content) {
-                    contentParts.push({ text: `\n文档：${file.displayName}\n${file.content}` });
-                } else {
-                    contentParts.push({
-                        fileData: {
-                            mimeType: file.mimeType,
-                            fileUri: file.uri
-                        }
-                    });
-                }
-            });
+            const convertedParts = convertContentParts(contentParts);
+            const result = await generateWithRetry(convertedParts, extractPrompt.role, -1);
+            return result;
         }
 
-        console.log(contentParts)
-
-        const convertedParts = convertContentParts(contentParts);
-        const result = await generateWithRetry(convertedParts, extractPrompt.role, -1);
-        return result;
-        
     } catch (error) {
         console.error(`Error in deepExtractChunk ${index}:`, error);
         return `片段 ${index + 1} 深度提取失败: ${error.message}`;
@@ -227,20 +254,54 @@ ${archPrompt.outputFormat}`;
     }
 }
 
-// Enhanced Agent 4: Citation Verifier
-export async function verifyCitations(report, transcript, combinedAnalyses, fileSummaries, fileUris, model) {
+// Enhanced Agent 4: Citation Verifier (RAG-optimized)
+export async function verifyCitations(report, transcript, combinedAnalyses, fileSummaries, fileUris, model, fileSearchStoreName = null) {
     try {
         const prompts = await loadEnhancedPrompts();
         const verifyPrompt = prompts.verifyCitations;
-        
+
         if (!verifyPrompt) {
             console.warn('Verify prompt not found, using fallback');
             return { verified: true, issues: [] };
         }
-        
-        // Build content parts with all available data
-        const contentParts = [
-            { text: `${verifyPrompt.role}
+
+        // Use File Search RAG if available
+        if (fileSearchStoreName) {
+            console.log('🔍 Using File Search RAG for citation verification');
+
+            const prompt = `${verifyPrompt.check ? verifyPrompt.check.map((task, i) => `${i + 1}. ${task}`).join('\n') : ''}
+
+报告内容:
+${report}
+
+原始访谈记录:
+${transcript}
+
+请从已上传的商业计划书文档中检索信息以交叉验证报告中的引用和数据。
+
+请按照以下格式输出验证结果：
+${verifyPrompt.outputFormat}`;
+
+            const contents = [{
+                role: 'user',
+                parts: [{ text: prompt }]
+            }];
+
+            const result = await generateWithFileSearch(contents, verifyPrompt.role, fileSearchStoreName, -1, model);
+
+            try {
+                return JSON.parse(result);
+            } catch {
+                return { verified: true, issues: [], note: result };
+            }
+
+        } else {
+            // TRADITIONAL MODE
+            console.log('📋 Using traditional full-context mode for citation verification');
+
+            // Build content parts with all available data
+            const contentParts = [
+                { text: `${verifyPrompt.role}
 
 ${verifyPrompt.check ? verifyPrompt.check.map((task, i) => `${i + 1}. ${task}`).join('\n') : ''}
 
@@ -255,38 +316,39 @@ ${report}
 
 原始访谈记录:
 ${transcript}` }
-        ];
-        
-        // Add uploaded files as verification sources
-        if (fileUris && fileUris.length > 0) {
-            contentParts.push({ text: '\n\n**原始文档用于交叉验证:**' });
-            fileUris.forEach(file => {
-                if (file.content) {
-                    // For local TXT files
-                    contentParts.push({ text: `\n文档：${file.displayName}\n${file.content}` });
-                } else {
-                    // For uploaded files
-                    contentParts.push({
-                        fileData: {
-                            mimeType: file.mimeType,
-                            fileUri: file.uri
-                        }
-                    });
-                }
-            });
+            ];
+
+            // Add uploaded files as verification sources
+            if (fileUris && fileUris.length > 0) {
+                contentParts.push({ text: '\n\n**原始文档用于交叉验证:**' });
+                fileUris.forEach(file => {
+                    if (file.content) {
+                        // For local TXT files
+                        contentParts.push({ text: `\n文档：${file.displayName}\n${file.content}` });
+                    } else {
+                        // For uploaded files
+                        contentParts.push({
+                            fileData: {
+                                mimeType: file.mimeType,
+                                fileUri: file.uri
+                            }
+                        });
+                    }
+                });
+            }
+
+            contentParts.push({ text: `\n\n请按照以下格式输出验证结果：\n${verifyPrompt.outputFormat}` });
+
+            const convertedParts = convertContentParts(contentParts);
+            const result = await generateWithRetry(convertedParts, verifyPrompt.role, -1);
+
+            try {
+                return JSON.parse(result);
+            } catch {
+                return { verified: true, issues: [], note: result };
+            }
         }
-        
-        contentParts.push({ text: `\n\n请按照以下格式输出验证结果：\n${verifyPrompt.outputFormat}` });
-        
-        const convertedParts = convertContentParts(contentParts);
-        const result = await generateWithRetry(convertedParts, verifyPrompt.role, -1);
-        
-        try {
-            return JSON.parse(result);
-        } catch {
-            return { verified: true, issues: [], note: result };
-        }
-        
+
     } catch (error) {
         console.error('Error in verifyCitations:', error);
         return { verified: false, error: error.message };
@@ -294,20 +356,58 @@ ${transcript}` }
 }
 
 
-// Enhanced Agent 5: Excellence Validator
-export async function validateExcellence(report, transcript, combinedAnalyses, fileUris, model) {
+// Enhanced Agent 5: Excellence Validator (RAG-optimized)
+export async function validateExcellence(report, transcript, combinedAnalyses, fileUris, model, fileSearchStoreName = null) {
     try {
         const prompts = await loadEnhancedPrompts();
         const validatePrompt = prompts.validateExcellence;
-        
+
         if (!validatePrompt) {
             console.warn('Validate prompt not found, using fallback');
             return { score: 85, pass: true };
         }
-        
-        // Build content parts with all available data for comprehensive evaluation
-        const contentParts = [
-            { text: `${validatePrompt.role}
+
+        // Use File Search RAG if available
+        if (fileSearchStoreName) {
+            console.log('🔍 Using File Search RAG for excellence validation');
+
+            const prompt = `评估标准：
+${validatePrompt.criteria.map((criteria, i) => `${i + 1}. ${criteria}`).join('\n')}
+
+评分系统：
+${validatePrompt.outputFormat}
+
+报告内容:
+${report}
+
+原始访谈记录（用于完整性评估）:
+${transcript}
+
+请从已上传的商业计划书文档中检索信息以评估报告的深度和质量。
+
+请按照以下格式输出评估结果：
+${JSON.stringify(validatePrompt.outputFormat, null, 2)}`;
+
+            const contents = [{
+                role: 'user',
+                parts: [{ text: prompt }]
+            }];
+
+            const result = await generateWithFileSearch(contents, validatePrompt.role, fileSearchStoreName, -1, model);
+
+            try {
+                return JSON.parse(result);
+            } catch {
+                return { score: 80, pass: true, note: result };
+            }
+
+        } else {
+            // TRADITIONAL MODE
+            console.log('📋 Using traditional full-context mode for excellence validation');
+
+            // Build content parts with all available data for comprehensive evaluation
+            const contentParts = [
+                { text: `${validatePrompt.role}
 
 评估标准：
 ${validatePrompt.criteria.map((criteria, i) => `${i + 1}. ${criteria}`).join('\n')}
@@ -323,38 +423,39 @@ ${transcript}
 
 商业计划书分析（用于深度评估）:
 ${combinedAnalyses || '无商业计划书数据'}` }
-        ];
-        
-        // Add uploaded files for comprehensive quality assessment
-        if (fileUris && fileUris.length > 0) {
-            contentParts.push({ text: '\n\n**原始文档用于质量评估:**' });
-            fileUris.forEach(file => {
-                if (file.content) {
-                    // For local TXT files
-                    contentParts.push({ text: `\n文档：${file.displayName}\n${file.content}` });
-                } else {
-                    // For uploaded files
-                    contentParts.push({
-                        fileData: {
-                            mimeType: file.mimeType,
-                            fileUri: file.uri
-                        }
-                    });
-                }
-            });
+            ];
+
+            // Add uploaded files for comprehensive quality assessment
+            if (fileUris && fileUris.length > 0) {
+                contentParts.push({ text: '\n\n**原始文档用于质量评估:**' });
+                fileUris.forEach(file => {
+                    if (file.content) {
+                        // For local TXT files
+                        contentParts.push({ text: `\n文档：${file.displayName}\n${file.content}` });
+                    } else {
+                        // For uploaded files
+                        contentParts.push({
+                            fileData: {
+                                mimeType: file.mimeType,
+                                fileUri: file.uri
+                            }
+                        });
+                    }
+                });
+            }
+
+            contentParts.push({ text: `\n\n请按照以下格式输出评估结果：\n${JSON.stringify(validatePrompt.outputFormat, null, 2)}` });
+
+            const convertedParts = convertContentParts(contentParts);
+            const result = await generateWithRetry(convertedParts, validatePrompt.role, -1);
+
+            try {
+                return JSON.parse(result);
+            } catch {
+                return { score: 80, pass: true, note: result };
+            }
         }
-        
-        contentParts.push({ text: `\n\n请按照以下格式输出评估结果：\n${JSON.stringify(validatePrompt.outputFormat, null, 2)}` });
-        
-        const convertedParts = convertContentParts(contentParts);
-        const result = await generateWithRetry(convertedParts, validatePrompt.role, -1);
-        
-        try {
-            return JSON.parse(result);
-        } catch {
-            return { score: 80, pass: true, note: result };
-        }
-        
+
     } catch (error) {
         console.error('Error in validateExcellence:', error);
         return { score: 75, pass: true, error: error.message };
