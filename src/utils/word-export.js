@@ -95,6 +95,79 @@ const FORMATTING_CONFIG = {
 };
 
 /**
+ * Parse text with inline markdown bold (**text**) and return array of TextRun objects
+ * @param {string} text - Text with markdown bold syntax
+ * @param {Object} fontConfig - Font configuration
+ * @param {number} size - Font size in half-points
+ * @param {boolean} defaultBold - Default bold state for non-markdown text
+ * @returns {Array<TextRun>} Array of TextRun objects with proper bold formatting
+ */
+function parseInlineBold(text, fontConfig, size, defaultBold = false) {
+    const runs = [];
+    const regex = /\*\*(.*?)\*\*/g;
+    let lastIndex = 0;
+    let match;
+
+    while ((match = regex.exec(text)) !== null) {
+        // Add regular text before the bold part
+        if (match.index > lastIndex) {
+            const regularText = text.substring(lastIndex, match.index);
+            runs.push(new TextRun({
+                text: regularText,
+                font: {
+                    name: fontConfig.family,
+                    eastAsia: fontConfig.eastAsia
+                },
+                size: size,
+                bold: defaultBold
+            }));
+        }
+
+        // Add bold text
+        runs.push(new TextRun({
+            text: match[1],
+            font: {
+                name: fontConfig.family,
+                eastAsia: fontConfig.eastAsia
+            },
+            size: size,
+            bold: true
+        }));
+
+        lastIndex = regex.lastIndex;
+    }
+
+    // Add remaining regular text
+    if (lastIndex < text.length) {
+        const regularText = text.substring(lastIndex);
+        runs.push(new TextRun({
+            text: regularText,
+            font: {
+                name: fontConfig.family,
+                eastAsia: fontConfig.eastAsia
+            },
+            size: size,
+            bold: defaultBold
+        }));
+    }
+
+    // If no markdown found, return single run with default bold state
+    if (runs.length === 0) {
+        runs.push(new TextRun({
+            text: text,
+            font: {
+                name: fontConfig.family,
+                eastAsia: fontConfig.eastAsia
+            },
+            size: size,
+            bold: defaultBold
+        }));
+    }
+
+    return runs;
+}
+
+/**
  * Pattern detection functions
  */
 const Patterns = {
@@ -188,10 +261,9 @@ function parseContent(markdown) {
         if (line.startsWith('## ')) {
             // Subtitle - treat as main section or convert to 【】
             let text = line.replace(/^##\s+/, '').trim();
-            // If text contains underline markdown or bold, clean it
-            text = text.replace(/\*\*\[(.*?)\]\{\.underline\}\*\*/g, '$1')
-                      .replace(/\[(.*?)\]\{\.underline\}/g, '$1')
-                      .replace(/\*\*(.*?)\*\*/g, '$1');
+            // If text contains underline markdown, clean it (but preserve bold)
+            text = text.replace(/\*\*\[(.*?)\]\{\.underline\}\*\*/g, '**$1**')
+                      .replace(/\[(.*?)\]\{\.underline\}/g, '$1');
 
             // Check if it already has 【】, if not add them
             if (!Patterns.isMainSection(text)) {
@@ -323,52 +395,28 @@ function createParagraph(element) {
     switch (element.type) {
         case 'documentHeader':
             const headerConfig = config.documentHeader[element.subtype];
+            // Parse inline bold formatting for document headers
+            const headerRuns = parseInlineBold(element.text, fontConfig, headerConfig.size, headerConfig.bold);
             return new Paragraph({
-                children: [
-                    new TextRun({
-                        text: element.text,
-                        font: {
-                            name: fontConfig.family,
-                            eastAsia: fontConfig.eastAsia
-                        },
-                        size: headerConfig.size,
-                        bold: headerConfig.bold
-                    })
-                ],
+                children: headerRuns,
                 spacing: headerConfig.spacing,
                 alignment: element.subtype === 'title' ? AlignmentType.LEFT : AlignmentType.LEFT
             });
 
         case 'mainSection':
+            // Parse inline bold formatting for main sections
+            const mainSectionRuns = parseInlineBold(element.text, fontConfig, config.mainSection.size, config.mainSection.bold);
             return new Paragraph({
-                children: [
-                    new TextRun({
-                        text: element.text,
-                        font: {
-                            name: fontConfig.family,
-                            eastAsia: fontConfig.eastAsia
-                        },
-                        size: config.mainSection.size,
-                        bold: config.mainSection.bold
-                    })
-                ],
+                children: mainSectionRuns,
                 spacing: config.mainSection.spacing,
                 indent: { left: config.mainSection.indent }
             });
 
         case 'subsection':
+            // Parse inline bold formatting for subsections
+            const subsectionRuns = parseInlineBold(element.text, fontConfig, config.subsection.size, config.subsection.bold);
             return new Paragraph({
-                children: [
-                    new TextRun({
-                        text: element.text,
-                        font: {
-                            name: fontConfig.family,
-                            eastAsia: fontConfig.eastAsia
-                        },
-                        size: config.subsection.size,
-                        bold: config.subsection.bold
-                    })
-                ],
+                children: subsectionRuns,
                 spacing: config.subsection.spacing,
                 indent: { left: config.subsection.indent }
             });
@@ -379,18 +427,11 @@ function createParagraph(element) {
             const numberMatch = element.text.match(/^(\d+)\.\s+/);
             const number = numberMatch ? numberMatch[1] : '';
 
+            // Parse inline bold formatting for numbered items
+            const numberedRuns = parseInlineBold(`${number}. ${numberedText}`, fontConfig, config.numbered.size, config.numbered.bold);
+
             return new Paragraph({
-                children: [
-                    new TextRun({
-                        text: `${number}. ${numberedText}`,
-                        font: {
-                            name: fontConfig.family,
-                            eastAsia: fontConfig.eastAsia
-                        },
-                        size: config.numbered.size,
-                        bold: config.numbered.bold
-                    })
-                ],
+                children: numberedRuns,
                 spacing: config.numbered.spacing,
                 indent: {
                     left: config.numbered.indent,
@@ -404,18 +445,11 @@ function createParagraph(element) {
             const letterMatch = element.text.match(/^([a-z])\.\s+/i);
             const letter = letterMatch ? letterMatch[1] : '';
 
+            // Parse inline bold formatting for subitems
+            const subitemRuns = parseInlineBold(`${letter}. ${subitemText}`, fontConfig, config.subitem.size, config.subitem.bold);
+
             return new Paragraph({
-                children: [
-                    new TextRun({
-                        text: `${letter}. ${subitemText}`,
-                        font: {
-                            name: fontConfig.family,
-                            eastAsia: fontConfig.eastAsia
-                        },
-                        size: config.subitem.size,
-                        bold: config.subitem.bold
-                    })
-                ],
+                children: subitemRuns,
                 spacing: config.subitem.spacing,
                 indent: {
                     left: config.subitem.indent,
@@ -427,18 +461,11 @@ function createParagraph(element) {
             // Remove the bullet character
             const bulletText = element.text.replace(/^[•\-–]\s+/, '');
 
+            // Parse inline bold formatting for bullets
+            const bulletRuns = parseInlineBold(`• ${bulletText}`, fontConfig, config.bullet.size, config.bullet.bold);
+
             return new Paragraph({
-                children: [
-                    new TextRun({
-                        text: `• ${bulletText}`,
-                        font: {
-                            name: fontConfig.family,
-                            eastAsia: fontConfig.eastAsia
-                        },
-                        size: config.bullet.size,
-                        bold: config.bullet.bold
-                    })
-                ],
+                children: bulletRuns,
                 spacing: config.bullet.spacing,
                 indent: {
                     left: config.bullet.indent,
@@ -448,50 +475,27 @@ function createParagraph(element) {
 
         case 'mixedFormat':
             // Create paragraph with multiple runs (bold + regular)
+            // Parse inline bold in both parts
+            const mixedBoldRuns = parseInlineBold(element.bold, fontConfig, fontConfig.size, true);
+            const mixedRegularRuns = parseInlineBold(element.regular, fontConfig, fontConfig.size, false);
+
             return new Paragraph({
-                children: [
-                    new TextRun({
-                        text: element.bold,
-                        font: {
-                            name: fontConfig.family,
-                            eastAsia: fontConfig.eastAsia
-                        },
-                        size: fontConfig.size,
-                        bold: true
-                    }),
-                    new TextRun({
-                        text: element.regular,
-                        font: {
-                            name: fontConfig.family,
-                            eastAsia: fontConfig.eastAsia
-                        },
-                        size: fontConfig.size,
-                        bold: false
-                    })
-                ],
+                children: [...mixedBoldRuns, ...mixedRegularRuns],
                 spacing: config.body.spacing
             });
 
         case 'body':
         default:
-            // Clean markdown formatting from body text
+            // Clean some markdown formatting from body text (preserve bold)
             let bodyText = element.text
-                .replace(/\*\*(.*?)\*\*/g, '$1')  // Remove bold
-                .replace(/\*(.*?)\*/g, '$1')      // Remove italic
+                .replace(/\*(.*?)\*/g, '$1')      // Remove italic (single asterisk)
                 .replace(/\[(.*?)\]\(.*?\)/g, '$1'); // Remove links
 
+            // Parse inline bold formatting
+            const bodyRuns = parseInlineBold(bodyText, fontConfig, config.body.size, config.body.bold);
+
             return new Paragraph({
-                children: [
-                    new TextRun({
-                        text: bodyText,
-                        font: {
-                            name: fontConfig.family,
-                            eastAsia: fontConfig.eastAsia
-                        },
-                        size: config.body.size,
-                        bold: config.body.bold
-                    })
-                ],
+                children: bodyRuns,
                 spacing: config.body.spacing,
                 indent: { left: config.body.indent }
             });
